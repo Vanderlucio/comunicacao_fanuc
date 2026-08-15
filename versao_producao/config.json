@@ -1,0 +1,91 @@
+{
+  "connection": {
+    "driver": "focas_dll",
+    "host": "192.168.1.100",
+    "port": 4840,
+    "timeout": 5000,
+    "focasPort": 8193,
+    "focasDllPath": "Fwlib32.dll",
+    "opcuaEndpoint": "opc.tcp://127.0.0.1:4840",
+    "username": "OpcUaClient",
+    "password": "OpcUaClient",
+    "autoReconnect": true,
+    "reconnectInterval": 3000
+  },
+  "pmcDefaults": {
+    "defaultAddressType": "R",
+    "defaultDataType": "Byte"
+  },
+  "monitoredPmcTags": [
+    {
+      "name": "Status_Geral",
+      "addressType": "R",
+      "address": 1000,
+      "length": 4,
+      "dataType": "Byte",
+      "description": "Relés internos de status do CLP Fanuc"
+    },
+    {
+      "name": "Entradas_Digitais",
+      "addressType": "X",
+      "address": 0,
+      "length": 2,
+      "dataType": "Byte",
+      "description": "Entradas físicas digitais (painel/sensores)"
+    },
+    {
+      "name": "Saidas_Digitais",
+      "addressType": "Y",
+      "address": 0,
+      "length": 2,
+      "dataType": "Byte",
+      "description": "Saídas físicas digitais (válvulas/atuadores)"
+    },
+    {
+      "name": "Keep_Relays",
+      "addressType": "K",
+      "address": 0,
+      "length": 4,
+      "dataType": "Byte",
+      "description": "Parâmetros de retenção de dados do CLP"
+    },
+    {
+      "name": "Tabela_Dados_D500",
+      "addressType": "D",
+      "address": 500,
+      "length": 2,
+      "dataType": "Word",
+      "description": "Registradores de dados numéricos (D500, D502)"
+    }
+  ],
+  "monitoredParameters": [
+    {
+      "paramNumber": 4000,
+      "axis": 0,
+      "name": "Param_Sistema_Geral",
+      "description": "Parâmetro geral de configuração CNC"
+    },
+    {
+      "paramNumber": 5001,
+      "axis": 1,
+      "name": "Posicao_Eixo_X",
+      "description": "Parâmetro do eixo X"
+    },
+    {
+      "paramNumber": 5001,
+      "axis": 2,
+      "name": "Posicao_Eixo_Y",
+      "description": "Parâmetro do eixo Y"
+    },
+    {
+      "paramNumber": 5001,
+      "axis": 3,
+      "name": "Posicao_Eixo_Z",
+      "description": "Parâmetro do eixo Z"
+    }
+  ],
+  "dashboard": {
+    "enabled": true,
+    "port": 3000
+  }
+}

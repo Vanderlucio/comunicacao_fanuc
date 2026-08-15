@@ -1,39 +1,39 @@
 # 🤖 Fanuc FOCAS & CLP (PMC) - Aplicação de Comunicação Industrial
 
-Aplicação em JavaScript (Node.js) e C# para comunicação, leitura e escrita de registradores do CLP (PMC) e parâmetros em máquinas CNC Fanuc através de múltiplos drivers industriais (FOCAS Nativo com DLLs oficiais `Fwlib32.dll`, FOCAS TCP Socket direto e OPC UA).
+Aplicação em JavaScript (Node.js) e C# para comunicação, telemetria, leitura e escrita de registradores do CLP (PMC) e parâmetros em máquinas CNC Fanuc através de múltiplos drivers industriais (FOCAS Nativo com DLLs oficiais `Fwlib32.dll`, FOCAS TCP Socket direto e OPC UA).
 
 ---
 
-## 📁 Estrutura do Repositório
+## 📁 Estrutura das Versões do Projeto
 
-- **[`versao_teste/`](./versao_teste/)**: Versão completa da aplicação industrial:
-  - **`src/`**: Clientes, drivers industriais (`opcua`, `focas_dll`, `focas_tcp`), decodificadores e servidor Express/WebSocket.
-  - **`public/`**: Dashboard Web industrial com telemetria em tempo real, editor de PMC e matriz interativa de bits/LEDs.
-  - **`util/`**: Catálogo estruturado de parâmetros Fanuc (`fanuc_parameters.json`), mapeamento de registradores do CLP (`pmc_registers.json`), funções de busca (`param_helper.js`) e [Guia Técnico de Parâmetros](./versao_teste/util/GUIA_PARAMETROS_E_PMC_FANUC.md).
-  - **`fanuc_bridge32.exe` / `fwlib32.cs` / `fwlib32.h`**: Bridge nativo x86 e mapeamento completo FOCAS.
-  - **DLLs Oficiais Fanuc**: `Fwlib32.dll`, `fwlib30i.dll`, `fwlib0iD.dll`, `fwlibe1.dll`, `Fwlib160.dll`, `Fwlib150.dll`, etc.
+| Pasta | Descrição | Casos de Uso |
+|---|---|---|
+| **[`versao_teste/`](./versao_teste/)** | Versão completa de testes, homologação e simulação | Testes em bancada, simulação com CNCnetPDM, desenvolvimento de novas telas e validação de parâmetros. |
+| **[`versao_producao/`](./versao_producao/)** | Versão otimizada para fábrica 24/7 | Conexão direta com a máquina CNC real via `Fwlib32.dll` (FOCAS), configuração para PM2 / Windows Service e auto-reconexão robusta. |
+| **[`versao_nodered/`](./versao_nodered/)** | Integração Industrial Node-RED & MQTT | Fluxos prontos para Node-RED com dashboard gráfico (`/ui`), publicação MQTT para sistemas MES/ERP e Indústria 4.0. |
 
 ---
 
-## 🚀 Como Executar
+## 🚀 Como Executar Cada Versão
 
-1. Entre na pasta `versao_teste`:
-   ```bash
-   cd versao_teste
-   ```
+### 1. Versão de Testes
+```bash
+cd versao_teste
+npm start
+```
+Acesse no navegador: **`http://localhost:3000`**
 
-2. Instale as dependências:
-   ```bash
-   npm install
-   ```
+### 2. Versão de Produção
+```bash
+cd versao_producao
+start_service.bat
+```
+*(Ou com PM2: `pm2 start pm2.config.js`)*
 
-3. Inicie o Dashboard Web:
-   ```bash
-   npm start
-   ```
-   Acesse no navegador: **`http://localhost:3000`**
-
-4. Ou utilize o console interativo CLI:
-   ```bash
-   npm run cli
-   ```
+### 3. Versão Node-RED
+```bash
+cd versao_nodered
+start_nodered.bat
+```
+Acesse o Dashboard: **`http://localhost:1880/ui`**
+Acesse o Editor: **`http://localhost:1880`**
