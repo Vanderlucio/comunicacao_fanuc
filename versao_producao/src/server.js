@@ -1,24 +1,22 @@
 /**
- * Servidor Web e API REST / WebSocket para o Dashboard Fanuc FOCAS / CLP
+ * Servidor Web e API REST / WebSocket Multi-Máquinas Fanuc FOCAS & CLP
+ * Persistência completa em SQLite com instâncias independentes por máquina
  */
 const express = require('express');
 const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
-const FanucClient = require('./fanuc_client');
-const { PMC_ADDRESS_TYPES, PMC_DATA_TYPES } = require('./constants');
+const DatabaseManager = require('./database/db');
+const MachineManager = require('./machine_manager');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const client = new FanucClient();
-const PORT = client.config.dashboard ? client.config.dashboard.port || 3000 : 3000;
+const db = new DatabaseManager();
+const machineManager = new MachineManager(db);
 
-// Proteção contra erros não tratados
-client.on('error', (err) => {
-  console.log(`[FanucClient Erro] ${err.message}`);
-});
+const PORT = process.env.PORT || 3000;
 
 process.on('uncaughtException', (err) => {
   console.error(`[Processo Erro Não Tratado] ${err.message}`);
@@ -31,178 +29,287 @@ process.on('unhandledRejection', (reason) => {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Inicializa conexão
-client.connect().catch(err => {
-  console.log(`[Dashboard] Inicialização: ${err.message}`);
+// ==================== REST API: MÁQUINAS ====================
+
+// Listar todas as máquinas
+app.get('/api/machines', async (req, res) => {
+  try {
+    const machines = await db.getAllMachines();
+    const fleet = await machineManager.getAllFleetTelemetry();
+    
+    // Mescla dados do banco com telemetria ativa
+    const result = machines.map(m => {
+      const live = fleet.find(f => f.machineId === m.id);
+      return {
+        ...m,
+        liveStatus: live ? live.status : { connected: false },
+        monitoredTags: live ? live.monitoredTags : []
+      };
+    });
+
+    res.json({ success: true, count: result.length, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// REST API Endpoints
-
-// Obter configuração atual e status
-app.get('/api/status', async (req, res) => {
+// Obter detalhes de uma máquina específica
+app.get('/api/machines/:id', async (req, res) => {
   try {
-    const status = await client.readStatus();
+    const machine = await db.getMachineById(req.params.id);
+    if (!machine) return res.status(404).json({ success: false, error: 'Máquina não encontrada' });
+    
+    const tags = await db.getPmcTagsByMachine(machine.id);
+    const params = await db.getParametersByMachine(machine.id);
+    const telemetry = await machineManager.updateTelemetryForMachine(machine.id);
+
     res.json({
       success: true,
-      config: client.config,
-      status
-    });
-  } catch (err) {
-    res.json({
-      success: true,
-      config: client.config,
-      status: {
-        connected: client.isConnected(),
-        driver: client.driver ? client.driver.name : 'Desconectado',
-        error: err.message,
-        timestamp: new Date().toISOString()
+      data: {
+        ...machine,
+        tags,
+        params,
+        telemetry
       }
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Trocar driver / atualizar conexão
-app.post('/api/connection', async (req, res) => {
+// Cadastrar nova máquina no SQLite
+app.post('/api/machines', async (req, res) => {
   try {
-    const { driver, host, port, focasPort, opcuaEndpoint } = req.body;
-    if (driver) client.config.connection.driver = driver;
-    if (host) client.config.connection.host = host;
-    if (port) client.config.connection.port = Number(port);
-    if (focasPort) client.config.connection.focasPort = Number(focasPort);
-    if (opcuaEndpoint) client.config.connection.opcuaEndpoint = opcuaEndpoint;
+    const { name, model, driver, host, focas_port, opcua_port, opcua_endpoint, username, password, timeout } = req.body;
+    if (!name || !host) {
+      return res.status(400).json({ success: false, error: 'Nome e Host (IP) são obrigatórios.' });
+    }
 
-    client.initDriver(client.config.connection.driver);
-    const connResult = await client.connect();
-
-    res.json({
-      success: true,
-      message: connResult.message,
-      config: client.config
+    const newMachine = await db.addMachine({
+      name,
+      model: model || 'Fanuc Series 0i',
+      driver: driver || 'focas_dll',
+      host,
+      focas_port: focas_port || 8193,
+      opcua_port: opcua_port || 4840,
+      opcua_endpoint: opcua_endpoint || `opc.tcp://${host}:${opcua_port || 4840}`,
+      username: username || '',
+      password: password || '',
+      timeout: timeout || 5000,
+      enabled: 1
     });
+
+    // Adiciona tags básicas de CLP padrão para a nova máquina
+    const mId = newMachine.id;
+    await db.addPmcTag(mId, { name: 'Status_Geral', address_type: 'R', address: 1000, length: 4, data_type: 'Byte', description: 'Relés internos R1000' });
+    await db.addPmcTag(mId, { name: 'Entradas_Painel', address_type: 'X', address: 0, length: 2, data_type: 'Byte', description: 'Entradas físicas X0' });
+    await db.addPmcTag(mId, { name: 'Saidas_Atuadores', address_type: 'Y', address: 0, length: 2, data_type: 'Byte', description: 'Saídas físicas Y0' });
+    await db.addPmcTag(mId, { name: 'Keep_Relays', address_type: 'K', address: 0, length: 4, data_type: 'Byte', description: 'Keep Relays K0' });
+
+    // Atualiza instâncias ativas no MachineManager
+    await machineManager.loadAndSyncClients();
+
+    res.json({ success: true, message: `Máquina '${newMachine.name}' adicionada com sucesso!`, data: newMachine });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Desconectar
-app.post('/api/disconnect', async (req, res) => {
+// Atualizar configuração de máquina no SQLite
+app.put('/api/machines/:id', async (req, res) => {
   try {
-    await client.disconnect();
-    res.json({ success: true, message: 'Desconectado com sucesso' });
+    const updated = await db.updateMachine(req.params.id, req.body);
+    await machineManager.loadAndSyncClients();
+    res.json({ success: true, message: 'Configurações da máquina atualizadas no banco de dados SQLite.', data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Ler PMC
-app.get('/api/pmc/read', async (req, res) => {
+// Excluir máquina do SQLite
+app.delete('/api/machines/:id', async (req, res) => {
   try {
-    const { type = 'R', address = 1000, count = 1, dataType = 'Byte' } = req.query;
-    const result = await client.readPmc(type, Number(address), Number(count), dataType);
-    res.json({ success: true, data: result });
+    await db.deleteMachine(req.params.id);
+    await machineManager.loadAndSyncClients();
+    res.json({ success: true, message: `Máquina ID ${req.params.id} removida com sucesso.` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Escrever PMC
-app.post('/api/pmc/write', async (req, res) => {
+// Conectar máquina
+app.post('/api/machines/:id/connect', async (req, res) => {
   try {
-    const { type = 'R', address = 1000, values, dataType = 'Byte' } = req.body;
-    const result = await client.writePmc(type, Number(address), values, dataType);
+    const result = await machineManager.connectMachine(req.params.id);
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Ler Bit PMC
-app.get('/api/pmc/bit/read', async (req, res) => {
+// Desconectar máquina
+app.post('/api/machines/:id/disconnect', async (req, res) => {
   try {
-    const { type = 'R', address = 1000, bit = 0 } = req.query;
-    const result = await client.readPmcBit(type, Number(address), Number(bit));
-    res.json({ success: true, data: result });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Escrever Bit PMC
-app.post('/api/pmc/bit/write', async (req, res) => {
-  try {
-    const { type = 'R', address = 1000, bit = 0, value = 1 } = req.body;
-    const result = await client.writePmcBit(type, Number(address), Number(bit), Number(value));
+    const result = await machineManager.disconnectMachine(req.params.id);
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Ler Parâmetro CNC
-app.get('/api/parameter/read', async (req, res) => {
+// ==================== OPERAÇÕES DE PMC / CLP POR MÁQUINA ====================
+
+// Ler registradores do CLP da máquina
+app.get('/api/machines/:id/pmc/read', async (req, res) => {
+  try {
+    const { addressType = 'R', startAddress = 1000, count = 1, dataType = 'Byte' } = req.query;
+    const data = await machineManager.readPmc(req.params.id, addressType, Number(startAddress), Number(count), dataType);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Escrever em registradores do CLP da máquina
+app.post('/api/machines/:id/pmc/write', async (req, res) => {
+  try {
+    const { addressType = 'R', startAddress = 1000, values = [0], dataType = 'Byte' } = req.body;
+    const result = await machineManager.writePmc(req.params.id, addressType, Number(startAddress), values, dataType);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Listar tags de PMC salvas no SQLite para a máquina
+app.get('/api/machines/:id/pmc/tags', async (req, res) => {
+  try {
+    const tags = await db.getPmcTagsByMachine(req.params.id);
+    res.json({ success: true, data: tags });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Adicionar/Persistir nova tag de PMC para a máquina
+app.post('/api/machines/:id/pmc/tags', async (req, res) => {
+  try {
+    const newTag = await db.addPmcTag(req.params.id, req.body);
+    res.json({ success: true, message: 'Tag de PMC salva com sucesso!', data: newTag });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Excluir tag de PMC
+app.delete('/api/machines/:id/pmc/tags/:tagId', async (req, res) => {
+  try {
+    await db.deletePmcTag(req.params.tagId);
+    res.json({ success: true, message: 'Tag excluída com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==================== PARÂMETROS CNC POR MÁQUINA ====================
+
+// Ler parâmetro CNC
+app.get('/api/machines/:id/parameter/read', async (req, res) => {
   try {
     const { paramNumber = 5001, axis = 0 } = req.query;
-    const result = await client.readParameter(Number(paramNumber), Number(axis));
-    res.json({ success: true, data: result });
+    const data = await machineManager.readParameter(req.params.id, Number(paramNumber), Number(axis));
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Escrever Parâmetro CNC
-app.post('/api/parameter/write', async (req, res) => {
+// Escrever parâmetro CNC
+app.post('/api/machines/:id/parameter/write', async (req, res) => {
   try {
     const { paramNumber = 5001, axis = 0, value = 0 } = req.body;
-    const result = await client.writeParameter(Number(paramNumber), Number(axis), Number(value));
+    const result = await machineManager.writeParameter(req.params.id, Number(paramNumber), Number(axis), Number(value));
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// WebSocket para telemetria em tempo real
-wss.on('connection', (ws) => {
-  const sendUpdate = async () => {
-    try {
-      if (ws.readyState === WebSocket.OPEN) {
-        const status = await client.readStatus();
-        const monitoredTags = [];
+// Listar parâmetros salvos para a máquina
+app.get('/api/machines/:id/parameters', async (req, res) => {
+  try {
+    const params = await db.getParametersByMachine(req.params.id);
+    res.json({ success: true, data: params });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-        for (const tag of (client.config.monitoredPmcTags || [])) {
-          try {
-            const data = await client.readPmc(tag.addressType, tag.address, tag.length || 1, tag.dataType || 'Byte');
-            monitoredTags.push({
-              tag,
-              data
-            });
-          } catch (e) {
-            monitoredTags.push({ tag, error: e.message });
-          }
-        }
+// Adicionar parâmetro monitorado para a máquina
+app.post('/api/machines/:id/parameters', async (req, res) => {
+  try {
+    const newParam = await db.addParameter(req.params.id, req.body);
+    res.json({ success: true, message: 'Parâmetro cadastrado com sucesso!', data: newParam });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-        ws.send(JSON.stringify({
-          type: 'telemetry',
-          status,
-          monitoredTags,
-          timestamp: new Date().toISOString()
-        }));
-      }
-    } catch (e) {}
-  };
+// Excluir parâmetro
+app.delete('/api/machines/:id/parameters/:paramId', async (req, res) => {
+  try {
+    await db.deleteParameter(req.params.paramId);
+    res.json({ success: true, message: 'Parâmetro removido com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-  const interval = setInterval(sendUpdate, 800);
-  sendUpdate();
+// ==================== WEBSOCKET MULTI-MÁQUINAS ====================
 
-  ws.on('close', () => {
-    clearInterval(interval);
+wss.on('connection', async (ws) => {
+  // Envia estado inicial de todas as máquinas assim que conecta
+  try {
+    const fleet = await machineManager.getAllFleetTelemetry();
+    ws.send(JSON.stringify({
+      type: 'fleet_telemetry',
+      fleet,
+      timestamp: new Date().toISOString()
+    }));
+  } catch (e) {}
+});
+
+// Transmissão broadcast contínua de telemetria da frota de máquinas
+machineManager.on('fleet_telemetry', (fleet) => {
+  const msg = JSON.stringify({
+    type: 'fleet_telemetry',
+    fleet,
+    timestamp: new Date().toISOString()
   });
+
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(msg);
+      } catch (e) {}
+    }
+  }
 });
 
-server.listen(PORT, () => {
-  console.log(`\n=============================================================`);
-  console.log(`  FANUC FOCAS / CLP DASHBOARD WEB PRONTO!                   `);
-  console.log(`  Acesse no seu navegador: http://localhost:${PORT}          `);
-  console.log(`=============================================================\n`);
+// Inicialização
+async function start() {
+  await machineManager.init();
+
+  server.listen(PORT, () => {
+    console.log(`\n=============================================================`);
+    console.log(`  FANUC FOCAS / CLP MULTI-MÁQUINAS (SQLITE) PRONTO!         `);
+    console.log(`  Acesse no seu navegador: http://localhost:${PORT}          `);
+    console.log(`=============================================================\n`);
+  });
+}
+
+start().catch(err => {
+  console.error('[Servidor Fatal]', err);
 });
 
-module.exports = { app, server };
+module.exports = { app, server, machineManager, db };

@@ -1,460 +1,736 @@
 /**
- * Frontend JavaScript para o Dashboard Fanuc FOCAS / CLP
+ * Frontend JavaScript - Console Multi-Máquinas Fanuc & CLP (PMC)
+ * Gerenciamento de instâncias individuais, persistência SQLite e controle em tempo real
  */
 
-let ws = null;
-let currentConfig = null;
-
-// Elementos da UI
-const statusPill = document.getElementById('connection-status-pill');
-const statusText = document.getElementById('status-text');
-const driverBadge = document.getElementById('current-driver-badge');
-const cncModeBadge = document.getElementById('cnc-mode-badge');
-const cncRunStatus = document.getElementById('cnc-run-status');
-const cncAlarmStatus = document.getElementById('cnc-alarm-status');
-const cncFeedrate = document.getElementById('cnc-feedrate');
-const cncSpindle = document.getElementById('cnc-spindle');
-
-const axisX = document.getElementById('axis-x');
-const axisY = document.getElementById('axis-y');
-const axisZ = document.getElementById('axis-z');
-const axisA = document.getElementById('axis-a');
-
-const logsConsole = document.getElementById('logs-console');
-const toastContainer = document.getElementById('toast-container');
-
-// Modal Elements
-const configModal = document.getElementById('config-modal');
-const btnConfigModal = document.getElementById('btn-config-modal');
-const btnCloseModal = document.getElementById('btn-close-modal');
-const btnModalSave = document.getElementById('btn-modal-save');
-const btnModalDisconnect = document.getElementById('btn-modal-disconnect');
-
-// Bit Matrices
-const matrixX0 = document.getElementById('bit-matrix-x0');
-const matrixY0 = document.getElementById('bit-matrix-y0');
-const matrixR1000 = document.getElementById('bit-matrix-r1000');
-const matrixK0 = document.getElementById('bit-matrix-k0');
-
-// PMC Control
-const pmcType = document.getElementById('pmc-type');
-const pmcAddress = document.getElementById('pmc-address');
-const pmcCount = document.getElementById('pmc-count');
-const pmcDataType = document.getElementById('pmc-data-type');
-const btnPmcRead = document.getElementById('btn-pmc-read');
-const btnPmcWrite = document.getElementById('btn-pmc-write');
-const pmcWriteValues = document.getElementById('pmc-write-values');
-const pmcResultsTbody = document.getElementById('pmc-results-tbody');
-
-// Param Control
-const paramNumber = document.getElementById('param-number');
-const paramAxis = document.getElementById('param-axis');
-const paramValueWrite = document.getElementById('param-value-write');
-const btnParamRead = document.getElementById('btn-param-read');
-const btnParamWrite = document.getElementById('btn-param-write');
-const paramResultDisplay = document.getElementById('param-result-display');
-
-// Inicialização
 document.addEventListener('DOMContentLoaded', () => {
-  setupBitMatrices();
-  setupEventListeners();
-  initWebSocket();
-  fetchInitialStatus();
-});
+  // Estado Global
+  let fleetData = [];
+  let activeMachineId = null;
+  let activeMachineData = null;
+  let ws = null;
 
-// Logs e Toasts
-function log(msg, type = 'info') {
-  const timeStr = new Date().toTimeString().split(' ')[0];
-  const div = document.createElement('div');
-  div.className = `log-entry log-${type}`;
-  div.innerHTML = `<span class="log-time">[${timeStr}]</span> <span class="log-msg">${msg}</span>`;
-  logsConsole.appendChild(div);
-  logsConsole.scrollTop = logsConsole.scrollHeight;
-}
+  // Elementos do DOM
+  const fleetGrid = document.getElementById('fleet-grid');
+  const statTotal = document.getElementById('stat-total-machines');
+  const statConnected = document.getElementById('stat-connected-machines');
+  const terminalLogs = document.getElementById('terminal-logs');
 
-function showToast(msg, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.textContent = msg;
-  toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-}
+  // Modais
+  const modalMachineConfig = document.getElementById('modal-machine-config');
+  const modalMachinePanel = document.getElementById('modal-machine-panel');
+  const modalAddTag = document.getElementById('modal-add-tag');
 
-// Configuração dos Botões de Bits
-function setupBitMatrices() {
-  function renderBits(container, addressType, address, isReadOnly = false) {
-    container.innerHTML = '';
-    for (let bit = 7; bit >= 0; bit--) {
-      const btn = document.createElement('div');
-      btn.className = 'bit-btn';
-      btn.id = `bit-${addressType}${address}-${bit}`;
-      btn.innerHTML = `<span class="bit-num">.${bit}</span><span class="bit-indicator"></span>`;
-      
-      if (!isReadOnly) {
-        btn.onclick = async () => {
-          const isActive = btn.classList.contains('active');
-          const newVal = isActive ? 0 : 1;
-          try {
-            const res = await fetch('/api/pmc/bit/write', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: addressType, address, bit, value: newVal })
-            });
-            const data = await res.json();
-            if (data.success) {
-              log(`Bit ${addressType}${address}.${bit} alternado para ${newVal}`, 'success');
-              btn.classList.toggle('active', newVal === 1);
-            }
-          } catch (e) {
-            showToast(`Erro ao alterar bit: ${e.message}`, 'error');
-          }
-        };
-      }
-      container.appendChild(btn);
-    }
-  }
+  // Botões Globais
+  document.getElementById('btn-open-add-machine').addEventListener('click', () => openMachineModal());
+  document.getElementById('btn-close-machine-modal').addEventListener('click', () => closeModal(modalMachineConfig));
+  document.getElementById('btn-cancel-machine').addEventListener('click', () => closeModal(modalMachineConfig));
+  document.getElementById('btn-close-machine-panel').addEventListener('click', () => closeMachinePanel());
+  document.getElementById('btn-refresh-fleet').addEventListener('click', () => loadFleet());
+  document.getElementById('btn-clear-logs').addEventListener('click', () => { terminalLogs.innerHTML = ''; });
 
-  renderBits(matrixX0, 'X', 0, true); // Entradas são somente leitura da máquina
-  renderBits(matrixY0, 'Y', 0, false);
-  renderBits(matrixR1000, 'R', 1000, false);
-  renderBits(matrixK0, 'K', 0, false);
-}
+  // Botão Sub-modal Tag
+  document.getElementById('btn-add-tag-modal').addEventListener('click', () => { modalAddTag.classList.add('active'); });
+  document.getElementById('btn-close-add-tag').addEventListener('click', () => { modalAddTag.classList.remove('active'); });
+  document.getElementById('btn-cancel-add-tag').addEventListener('click', () => { modalAddTag.classList.remove('active'); });
 
-function updateBitGroup(addressType, address, byteVal) {
-  for (let bit = 0; bit < 8; bit++) {
-    const el = document.getElementById(`bit-${addressType}${address}-${bit}`);
-    if (el) {
-      const isSet = (byteVal & (1 << bit)) !== 0;
-      el.classList.toggle('active', isSet);
-    }
-  }
-}
-
-// Conexão WebSocket para Telemetria em Tempo Real
-function initWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}`;
-  ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {
-    // WebSocket conectado ao servidor local
-  };
-
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data);
-      if (msg.type === 'telemetry') {
-        updateTelemetry(msg.status, msg.monitoredTags);
-      }
-    } catch (e) {}
-  };
-
-  ws.onclose = () => {
-    updateConnectionUI(false, 'DESCONECTADO', 'Servidor offline');
-    setTimeout(initWebSocket, 2000);
-  };
-}
-
-function updateConnectionUI(connected, driverName = '', error = '') {
-  if (connected) {
-    statusPill.classList.remove('disconnected');
-    statusText.textContent = 'CNC CONECTADO';
-    driverBadge.textContent = `DRIVER: ${(driverName || 'FANUC').toUpperCase()}`;
-    driverBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-    driverBadge.style.color = '#6ee7b7';
-  } else {
-    statusPill.classList.add('disconnected');
-    statusText.textContent = 'DESCONECTADO';
-    driverBadge.textContent = `DRIVER: ${(driverName || 'OFFLINE').toUpperCase()} (OFFLINE)`;
-    driverBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-    driverBadge.style.color = '#fca5a5';
-  }
-}
-
-// Atualiza a tela com a telemetria recebida
-function updateTelemetry(status, monitoredTags) {
-  if (status) {
-    const isConn = status.connected === true;
-    updateConnectionUI(isConn, status.driver || (currentConfig && currentConfig.connection && currentConfig.connection.driver));
-
-    const elProg = document.getElementById('cnc-program');
-    const elParts = document.getElementById('cnc-parts-count');
-
-    if (isConn) {
-      if (status.mode) cncModeBadge.textContent = `MODO: ${status.mode}`;
-      if (status.runStatus) cncRunStatus.textContent = status.runStatus;
-      if (status.feedrate !== undefined) cncFeedrate.textContent = `${status.feedrate} mm/min`;
-      if (status.spindleSpeed !== undefined) cncSpindle.textContent = `${status.spindleSpeed} RPM`;
-      if (elProg && status.program !== undefined) elProg.textContent = status.program;
-      if (elParts && status.partsCount !== undefined) elParts.textContent = status.partsCount;
-      
-      if (status.alarm !== undefined) {
-        cncAlarmStatus.textContent = status.alarm ? (status.alarmText || 'ALARME ATIVO') : (status.alarmText || 'Normal');
-        cncAlarmStatus.className = status.alarm ? 'telemetry-value text-danger' : 'telemetry-value status-ok';
-      }
-      
-      if (status.positions) {
-        if (status.positions.X !== undefined) axisX.textContent = typeof status.positions.X === 'number' ? status.positions.X.toFixed(3) : status.positions.X;
-        if (status.positions.Y !== undefined) axisY.textContent = typeof status.positions.Y === 'number' ? status.positions.Y.toFixed(3) : status.positions.Y;
-        if (status.positions.Z !== undefined) axisZ.textContent = typeof status.positions.Z === 'number' ? status.positions.Z.toFixed(3) : status.positions.Z;
-        if (status.positions.A !== undefined) axisA.textContent = typeof status.positions.A === 'number' ? status.positions.A.toFixed(3) : status.positions.A;
-      }
-    } else {
-      cncModeBadge.textContent = 'MODO: OFFLINE';
-      cncRunStatus.textContent = 'DESCONECTADO';
-      cncFeedrate.textContent = '---';
-      cncSpindle.textContent = '---';
-      if (elProg) elProg.textContent = '---';
-      if (elParts) elParts.textContent = '---';
-      cncAlarmStatus.textContent = '---';
-      cncAlarmStatus.className = 'telemetry-value text-muted';
-      axisX.textContent = '---';
-      axisY.textContent = '---';
-      axisZ.textContent = '---';
-      axisA.textContent = '---';
-
-      // Limpa valores de texto e apaga todos os LEDs de bits
-      const elX0 = document.getElementById('byte-val-x0');
-      const elY0 = document.getElementById('byte-val-y0');
-      const elR1000 = document.getElementById('byte-val-r1000');
-      const elK0 = document.getElementById('byte-val-k0');
-      if (elX0) elX0.textContent = 'Valor: ---';
-      if (elY0) elY0.textContent = 'Valor: ---';
-      if (elR1000) elR1000.textContent = 'Valor: ---';
-      if (elK0) elK0.textContent = 'Valor: ---';
-
-      document.querySelectorAll('.bit-btn').forEach(btn => btn.classList.remove('active'));
-    }
-  }
-
-  if (monitoredTags && Array.isArray(monitoredTags)) {
-    monitoredTags.forEach(item => {
-      if (item.data && item.data.values && item.data.values.length > 0) {
-        const type = item.data.addressType;
-        const addr = item.data.startAddress;
-        const firstVal = item.data.values[0];
-
-        if (type === 'X' && addr === 0) {
-          document.getElementById('byte-val-x0').textContent = `Valor: ${firstVal} (0x${firstVal.toString(16).toUpperCase().padStart(2, '0')})`;
-          updateBitGroup('X', 0, firstVal);
-        } else if (type === 'Y' && addr === 0) {
-          document.getElementById('byte-val-y0').textContent = `Valor: ${firstVal} (0x${firstVal.toString(16).toUpperCase().padStart(2, '0')})`;
-          updateBitGroup('Y', 0, firstVal);
-        } else if (type === 'R' && addr === 1000) {
-          document.getElementById('byte-val-r1000').textContent = `Valor: ${firstVal} (0x${firstVal.toString(16).toUpperCase().padStart(2, '0')})`;
-          updateBitGroup('R', 1000, firstVal);
-        } else if (type === 'K' && addr === 0) {
-          document.getElementById('byte-val-k0').textContent = `Valor: ${firstVal} (0x${firstVal.toString(16).toUpperCase().padStart(2, '0')})`;
-          updateBitGroup('K', 0, firstVal);
-        }
-      }
+  // Abas do Painel Individual
+  const panelTabs = document.querySelectorAll('.panel-tab');
+  panelTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      panelTabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      const target = document.getElementById(tab.dataset.tab);
+      if (target) target.classList.add('active');
     });
-  }
-}
+  });
 
-// Obter status inicial
-async function fetchInitialStatus() {
-  try {
-    const res = await fetch('/api/status');
-    const data = await res.json();
-    if (data.success) {
-      currentConfig = data.config;
-      const isConn = data.status && data.status.connected === true;
-      updateConnectionUI(isConn, data.config.connection.driver);
+  // Alternância de Campos no Modal de Máquina (FOCAS vs OPC UA)
+  const driverSelect = document.getElementById('select-machine-driver');
+  driverSelect.addEventListener('change', () => {
+    const isOpcUa = driverSelect.value === 'opcua';
+    document.getElementById('options-opcua').style.display = isOpcUa ? 'block' : 'none';
+    document.getElementById('options-focas').style.display = isOpcUa ? 'none' : 'block';
+  });
 
-      if (isConn) {
-        log(`Conectado via ${data.config.connection.driver.toUpperCase()} em ${data.config.connection.host}`, 'success');
-      } else {
-        log(`CNC Desconectado (${data.config.connection.driver.toUpperCase()} em ${data.config.connection.host}). Clique em Conexão para configurar.`, 'info');
-      }
-    }
-  } catch (e) {
-    updateConnectionUI(false, 'OFFLINE');
-    log(`Erro ao obter status inicial: ${e.message}`, 'error');
-  }
-}
+  // Formulário de Cadastro/Edição de Máquina
+  const formMachineConfig = document.getElementById('form-machine-config');
+  formMachineConfig.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('input-machine-id').value;
+    const isEdit = Boolean(id);
 
-// Event Listeners
-function setupEventListeners() {
-  // Modal de Configuração
-  btnConfigModal.onclick = () => {
-    if (currentConfig && currentConfig.connection) {
-      document.getElementById('cfg-driver').value = currentConfig.connection.driver || 'opcua';
-      document.getElementById('cfg-host').value = currentConfig.connection.host || '127.0.0.1';
-      document.getElementById('cfg-port').value = currentConfig.connection.port || 4840;
-      document.getElementById('cfg-focas-port').value = currentConfig.connection.focasPort || 8193;
-      document.getElementById('cfg-opcua-endpoint').value = currentConfig.connection.opcuaEndpoint || 'opc.tcp://127.0.0.1:4840';
-    }
-    configModal.classList.add('open');
-  };
-
-  btnCloseModal.onclick = () => configModal.classList.remove('open');
-
-  btnModalSave.onclick = async () => {
-    const newConn = {
-      driver: document.getElementById('cfg-driver').value,
-      host: document.getElementById('cfg-host').value,
-      port: Number(document.getElementById('cfg-port').value),
-      focasPort: Number(document.getElementById('cfg-focas-port').value),
-      opcuaEndpoint: document.getElementById('cfg-opcua-endpoint').value
+    const payload = {
+      name: document.getElementById('input-machine-name').value.trim(),
+      model: document.getElementById('input-machine-model').value.trim(),
+      driver: document.getElementById('select-machine-driver').value,
+      host: document.getElementById('input-machine-host').value.trim(),
+      focas_port: Number(document.getElementById('input-machine-focas-port').value),
+      opcua_port: Number(document.getElementById('input-machine-opcua-port').value),
+      opcua_endpoint: document.getElementById('input-machine-opcua-endpoint').value.trim(),
+      username: document.getElementById('input-machine-username').value.trim(),
+      password: document.getElementById('input-machine-password').value,
+      timeout: Number(document.getElementById('input-machine-timeout').value)
     };
 
     try {
-      const res = await fetch('/api/connection', {
-        method: 'POST',
+      const url = isEdit ? `/api/machines/${id}` : '/api/machines';
+      const method = isEdit ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newConn)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
+
       if (data.success) {
-        showToast('Configuração salva e reconectada!', 'success');
-        configModal.classList.remove('open');
-        fetchInitialStatus();
+        log(`[SQLite] Máquina '${payload.name}' ${isEdit ? 'atualizada' : 'cadastrada'} com sucesso!`, 'log-success');
+        closeModal(modalMachineConfig);
+        await loadFleet();
       } else {
-        showToast(data.error || 'Erro ao conectar', 'error');
+        alert(`Erro ao salvar máquina: ${data.error}`);
       }
-    } catch (e) {
-      showToast(e.message, 'error');
+    } catch (err) {
+      log(`[Erro] Falha ao salvar máquina: ${err.message}`, 'log-error');
     }
-  };
+  });
 
-  btnModalDisconnect.onclick = async () => {
+  // ==================== CARREGAMENTO DA FROTA ====================
+
+  async function loadFleet() {
     try {
-      await fetch('/api/disconnect', { method: 'POST' });
-      showToast('Desconectado', 'info');
-      configModal.classList.remove('open');
-    } catch (e) {
-      showToast(e.message, 'error');
-    }
-  };
+      const res = await fetch('/api/machines');
+      const json = await res.json();
+      if (json.success) {
+        fleetData = json.data;
+        renderFleetGrid(fleetData);
+        updateFleetStats(fleetData);
 
-  // Leitura de PMC
-  btnPmcRead.onclick = async () => {
-    const type = pmcType.value;
-    const addr = Number(pmcAddress.value);
-    const count = Number(pmcCount.value);
-    const dataType = pmcDataType.value;
-
-    try {
-      const res = await fetch(`/api/pmc/read?type=${type}&address=${addr}&count=${count}&dataType=${dataType}`);
-      const data = await res.json();
-
-      if (data.success && data.data) {
-        const pmc = data.data;
-        pmcResultsTbody.innerHTML = '';
-        log(`Leitura de ${pmc.count} item(ns) em ${pmc.addressType}${pmc.startAddress} realizada com sucesso`, 'success');
-
-        pmc.values.forEach((val, idx) => {
-          const row = document.createElement('tr');
-          const currentAddr = `${pmc.addressType}${pmc.startAddress + idx}`;
-          const hex = '0x' + (val < 0 ? (val >>> 0) : val).toString(16).toUpperCase();
-          const bin = pmc.dataType === 'Byte' ? (val & 0xFF).toString(2).padStart(8, '0') : '-';
-
-          row.innerHTML = `
-            <td><strong>${currentAddr}</strong></td>
-            <td>${val}</td>
-            <td><code>${hex}</code></td>
-            <td><code>${bin}</code></td>
-          `;
-          pmcResultsTbody.appendChild(row);
-        });
-      } else {
-        showToast(data.error || 'Erro na leitura', 'error');
-        log(`Erro na leitura PMC: ${data.error}`, 'error');
+        // Se o modal de uma máquina estiver aberto, atualiza seus dados
+        if (activeMachineId) {
+          const current = fleetData.find(m => m.id === activeMachineId);
+          if (current) updateActiveMachineView(current);
+        }
       }
-    } catch (e) {
-      showToast(e.message, 'error');
+    } catch (err) {
+      log(`[Erro] Não foi possível carregar a lista de máquinas: ${err.message}`, 'log-error');
     }
-  };
+  }
 
-  // Escrita de PMC
-  btnPmcWrite.onclick = async () => {
-    const type = pmcType.value;
-    const addr = Number(pmcAddress.value);
-    const dataType = pmcDataType.value;
-    const rawVal = pmcWriteValues.value.trim();
+  function updateFleetStats(machines) {
+    statTotal.textContent = machines.length;
+    const connectedCount = machines.filter(m => m.liveStatus && m.liveStatus.connected).length;
+    statConnected.textContent = connectedCount;
+  }
 
-    if (!rawVal) {
-      showToast('Insira os valores a serem escritos', 'warning');
+  function renderFleetGrid(machines) {
+    if (machines.length === 0) {
+      fleetGrid.innerHTML = `
+        <div class="loading-state">
+          <span>Nenhuma máquina cadastrada no banco de dados SQLite.</span>
+          <button class="btn btn-primary" onclick="document.getElementById('btn-open-add-machine').click()">
+            ➕ Cadastrar Primeira Máquina
+          </button>
+        </div>
+      `;
       return;
     }
 
-    const values = rawVal.split(',').map(v => Number(v.trim()));
+    fleetGrid.innerHTML = machines.map(m => {
+      const live = m.liveStatus || { connected: false };
+      const isConnected = Boolean(live.connected);
+      const dotClass = isConnected ? 'status-indicator-dot connected' : 'status-indicator-dot disconnected';
+      const driverLabels = {
+        'focas_dll': 'FOCAS DLL',
+        'focas_tcp': 'FOCAS TCP',
+        'opcua': 'OPC UA'
+      };
+
+      const mode = isConnected ? (live.mode || 'Auto') : '---';
+      const runStatus = isConnected ? (live.runStatus || 'Parado') : 'DESCONECTADO';
+      const prog = isConnected ? (live.program ? `O${live.program}` : '---') : '---';
+      const parts = isConnected ? (live.partsCount !== undefined ? live.partsCount : '---') : '---';
+      const spindle = isConnected ? (live.spindleSpeed !== undefined ? `${live.spindleSpeed} RPM` : '---') : '---';
+      const feed = isConnected ? (live.feedrate !== undefined ? `${live.feedrate} mm/min` : '---') : '---';
+
+      return `
+        <div class="machine-card" data-machine-id="${m.id}">
+          <div class="machine-card-header">
+            <div class="machine-card-title-box">
+              <span class="${dotClass}"></span>
+              <div>
+                <div class="machine-card-name">${escapeHtml(m.name)}</div>
+                <div class="machine-card-model">${escapeHtml(m.model || 'CNC Fanuc')}</div>
+              </div>
+            </div>
+            <span class="machine-driver-badge">${driverLabels[m.driver] || m.driver}</span>
+          </div>
+
+          <div class="machine-card-body">
+            <div class="machine-meta-row">
+              <span>Endereço IP:</span>
+              <span class="machine-meta-val">${escapeHtml(m.host)}:${m.driver === 'opcua' ? m.opcua_port : m.focas_port}</span>
+            </div>
+            <div class="machine-meta-row">
+              <span>Status:</span>
+              <span class="machine-meta-val ${isConnected ? 'text-success' : 'text-danger'}">
+                ${isConnected ? '🟢 CONECTADO' : '🔴 DESCONECTADO'}
+              </span>
+            </div>
+
+            <!-- Mini Telemetria -->
+            <div class="machine-telemetry-preview">
+              <div class="preview-item">
+                <span class="preview-label">Modo</span>
+                <span class="preview-val">${mode}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">Execução</span>
+                <span class="preview-val">${runStatus}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">Programa</span>
+                <span class="preview-val highlight">${prog}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">Peças</span>
+                <span class="preview-val highlight">${parts}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">Spindle</span>
+                <span class="preview-val">${spindle}</span>
+              </div>
+              <div class="preview-item">
+                <span class="preview-label">Avanço</span>
+                <span class="preview-val">${feed}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="machine-card-footer">
+            <button class="btn btn-primary btn-sm btn-open-panel" data-id="${m.id}">
+              ⚡ Abrir Painel de Controle
+            </button>
+            <div style="display:flex; gap: 0.35rem;">
+              <button class="btn btn-secondary btn-icon-only btn-edit-machine" data-id="${m.id}" title="Editar Configurações">
+                ✏️
+              </button>
+              <button class="btn btn-secondary btn-icon-only btn-delete-machine" data-id="${m.id}" title="Excluir Máquina">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Adiciona Event Listeners nos botões dos cards
+    document.querySelectorAll('.btn-open-panel').forEach(b => {
+      b.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.dataset.id);
+        openMachinePanel(id);
+      });
+    });
+
+    document.querySelectorAll('.btn-edit-machine').forEach(b => {
+      b.addEventListener('click', (e) => {
+        const id = Number(e.currentTarget.dataset.id);
+        const m = fleetData.find(x => x.id === id);
+        if (m) openMachineModal(m);
+      });
+    });
+
+    document.querySelectorAll('.btn-delete-machine').forEach(b => {
+      b.addEventListener('click', async (e) => {
+        const id = Number(e.currentTarget.dataset.id);
+        const m = fleetData.find(x => x.id === id);
+        if (confirm(`Deseja realmente excluir a máquina '${m ? m.name : id}' do banco de dados SQLite?`)) {
+          await deleteMachine(id);
+        }
+      });
+    });
+  }
+
+  // ==================== PAINEL INDIVIDUAL DA MÁQUINA (MODAL 2) ====================
+
+  async function openMachinePanel(machineId) {
+    activeMachineId = machineId;
+    activeMachineData = fleetData.find(m => m.id === machineId);
+
+    if (!activeMachineData) {
+      log(`[Aviso] Máquina ID ${machineId} não encontrada.`, 'log-warn');
+      return;
+    }
+
+    // Atualiza cabeçalho do modal
+    document.getElementById('panel-machine-title').textContent = activeMachineData.name;
+    document.getElementById('panel-machine-subtitle').textContent = `IP: ${activeMachineData.host} | Driver: ${activeMachineData.driver.toUpperCase()} | Modelo: ${activeMachineData.model || 'CNC Fanuc'}`;
+    
+    // Atualiza status e botões
+    updateActiveMachineView(activeMachineData);
+
+    // Carrega tags salvas do SQLite
+    await loadSavedTagsForActiveMachine();
+
+    // Abre o modal
+    modalMachinePanel.classList.add('active');
+  }
+
+  function closeMachinePanel() {
+    modalMachinePanel.classList.remove('active');
+    activeMachineId = null;
+    activeMachineData = null;
+  }
+
+  function updateActiveMachineView(machine) {
+    if (!machine || machine.id !== activeMachineId) return;
+
+    const live = machine.liveStatus || { connected: false };
+    const isConnected = Boolean(live.connected);
+
+    // Dot do cabeçalho
+    const dot = document.getElementById('panel-machine-dot');
+    dot.className = isConnected ? 'status-indicator-dot connected' : 'status-indicator-dot disconnected';
+
+    // Botão Conectar/Desconectar do painel
+    const btnToggle = document.getElementById('btn-panel-toggle-connect');
+    btnToggle.textContent = isConnected ? '🛑 Desconectar' : '🔌 Conectar';
+    btnToggle.className = isConnected ? 'btn btn-danger btn-sm' : 'btn btn-outline btn-sm';
+    btnToggle.onclick = async () => {
+      const endpoint = isConnected ? 'disconnect' : 'connect';
+      try {
+        log(`[Comando] ${isConnected ? 'Desconectando' : 'Conectando'} ${machine.name}...`, 'log-info');
+        const res = await fetch(`/api/machines/${machine.id}/${endpoint}`, { method: 'POST' });
+        const resData = await res.json();
+        if (resData.success) {
+          log(`[Conexão] ${machine.name}: ${isConnected ? 'Desconectado' : 'Conectado com sucesso'}`, 'log-success');
+          await loadFleet();
+        }
+      } catch (err) {
+        log(`[Erro] Falha ao alternar conexão: ${err.message}`, 'log-error');
+      }
+    };
+
+    // Telemetria da máquina
+    document.getElementById('panel-cnc-mode').textContent = isConnected ? (live.mode || '---') : '---';
+    document.getElementById('panel-cnc-run').textContent = isConnected ? (live.runStatus || '---') : 'DESCONECTADO';
+    document.getElementById('panel-cnc-prog').textContent = isConnected ? (live.program ? `O${live.program}` : '---') : '---';
+    document.getElementById('panel-cnc-parts').textContent = isConnected ? (live.partsCount !== undefined ? live.partsCount : '---') : '---';
+    document.getElementById('panel-cnc-feed').textContent = isConnected ? (live.feedrate !== undefined ? `${live.feedrate} mm/min` : '---') : '---';
+    document.getElementById('panel-cnc-spindle').textContent = isConnected ? (live.spindleSpeed !== undefined ? `${live.spindleSpeed} RPM` : '---') : '---';
+    document.getElementById('panel-cnc-alarm').textContent = isConnected ? (live.alarm ? `⚠️ ${live.alarmText}` : 'Normal') : '---';
+
+    // Eixos
+    const pos = isConnected && live.positions ? live.positions : {};
+    document.getElementById('panel-axis-x').textContent = isConnected && pos.X !== undefined ? (typeof pos.X === 'number' ? pos.X.toFixed(3) : pos.X) : '---';
+    document.getElementById('panel-axis-y').textContent = isConnected && pos.Y !== undefined ? (typeof pos.Y === 'number' ? pos.Y.toFixed(3) : pos.Y) : '---';
+    document.getElementById('panel-axis-z').textContent = isConnected && pos.Z !== undefined ? (typeof pos.Z === 'number' ? pos.Z.toFixed(3) : pos.Z) : '---';
+    document.getElementById('panel-axis-a').textContent = isConnected && pos.A !== undefined ? (typeof pos.A === 'number' ? pos.A.toFixed(3) : pos.A) : '---';
+
+    // Atualiza Painel de Bits (I/O)
+    renderBitMatrices(machine);
+  }
+
+  // ==================== PAINEL DE BITS (I/O) ====================
+
+  function renderBitMatrices(machine) {
+    const isConnected = Boolean(machine.liveStatus && machine.liveStatus.connected);
+
+    // Encontra tags de X0, Y0, R1000 e K0 nos monitoredTags
+    const tags = machine.monitoredTags || [];
+    const getByteVal = (type, addr) => {
+      if (!isConnected) return null;
+      const found = tags.find(t => t.tag && t.tag.address_type === type && Number(t.tag.address) === addr);
+      if (found && found.data && found.data.values && found.data.values.length > 0) {
+        return found.data.values[0];
+      }
+      return null;
+    };
+
+    renderBitGroup('panel-matrix-x0', 'panel-byte-x0', 'X', 0, getByteVal('X', 0), false);
+    renderBitGroup('panel-matrix-y0', 'panel-byte-y0', 'Y', 0, getByteVal('Y', 0), true);
+    renderBitGroup('panel-matrix-r1000', 'panel-byte-r1000', 'R', 1000, getByteVal('R', 1000), true);
+    renderBitGroup('panel-matrix-k0', 'panel-byte-k0', 'K', 0, getByteVal('K', 0), true);
+  }
+
+  function renderBitGroup(matrixId, labelId, type, address, val, allowWrite) {
+    const matrix = document.getElementById(matrixId);
+    const label = document.getElementById(labelId);
+    if (!matrix) return;
+
+    if (val === null || val === undefined) {
+      label.textContent = 'Valor: ---';
+      matrix.innerHTML = Array.from({ length: 8 }, (_, i) => `
+        <div class="bit-btn">
+          <span class="bit-led"></span>
+          <span>.${7 - i}</span>
+        </div>
+      `).join('');
+      return;
+    }
+
+    label.textContent = `Dec: ${val} (0x${val.toString(16).toUpperCase().padStart(2, '0')})`;
+
+    matrix.innerHTML = Array.from({ length: 8 }, (_, i) => {
+      const bitIndex = 7 - i;
+      const isSet = ((val >> bitIndex) & 1) === 1;
+      return `
+        <div class="bit-btn ${isSet ? 'active' : ''}" data-bit="${bitIndex}" data-type="${type}" data-addr="${address}" data-current="${val}">
+          <span class="bit-led"></span>
+          <span>.${bitIndex}</span>
+        </div>
+      `;
+    }).join('');
+
+    if (allowWrite && activeMachineId) {
+      matrix.querySelectorAll('.bit-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const bitIndex = Number(btn.dataset.bit);
+          const currentVal = Number(btn.dataset.current);
+          const newVal = currentVal ^ (1 << bitIndex); // Inverte bit
+
+          try {
+            log(`[Escrita Bit] Alterando ${type}${address}.${bitIndex} para ${(newVal >> bitIndex) & 1} na máquina ${activeMachineId}...`, 'log-info');
+            const res = await fetch(`/api/machines/${activeMachineId}/pmc/write`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                addressType: type,
+                startAddress: address,
+                values: [newVal],
+                dataType: 'Byte'
+              })
+            });
+            const resJson = await res.json();
+            if (resJson.success) {
+              log(`[Escrita Bit OK] ${type}${address}.${bitIndex} gravado com sucesso!`, 'log-success');
+              await loadFleet();
+            }
+          } catch (e) {
+            log(`[Erro Escrita Bit] ${e.message}`, 'log-error');
+          }
+        };
+      });
+    }
+  }
+
+  // ==================== LEITURA & ESCRITA PMC (ABA 3) ====================
+
+  document.getElementById('form-panel-pmc-read').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!activeMachineId) return;
+
+    const addressType = document.getElementById('panel-pmc-type').value;
+    const startAddress = Number(document.getElementById('panel-pmc-address').value);
+    const count = Number(document.getElementById('panel-pmc-count').value);
+    const dataType = document.getElementById('panel-pmc-datatype').value;
+
+    const tbody = document.getElementById('panel-pmc-results-tbody');
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center">Consultando CLP da máquina ${activeMachineId}...</td></tr>`;
 
     try {
-      const res = await fetch('/api/pmc/write', {
+      const res = await fetch(`/api/machines/${activeMachineId}/pmc/read?addressType=${addressType}&startAddress=${startAddress}&count=${count}&dataType=${dataType}`);
+      const json = await res.json();
+
+      if (json.success && json.data && json.data.values) {
+        const values = json.data.values;
+        tbody.innerHTML = values.map((val, idx) => {
+          const addr = startAddress + idx;
+          const num = typeof val === 'number' ? val : (Number(val) || 0);
+          const hex = num.toString(16).toUpperCase().padStart(dataType === 'Word' ? 4 : 2, '0');
+          const bin = num.toString(2).padStart(8, '0');
+          return `
+            <tr>
+              <td><strong>${addressType}${addr}</strong></td>
+              <td>${val !== null && val !== undefined ? val : 0}</td>
+              <td><code>0x${hex}</code></td>
+              <td><code>${bin.slice(0, 4)} ${bin.slice(4)}</code></td>
+            </tr>
+          `;
+        }).join('');
+        log(`[PMC Read] Lidos ${values.length} registradores (${addressType}${startAddress}) da máquina ${activeMachineId}`, 'log-success');
+      } else {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">Erro: ${json.error || 'Falha na leitura'}</td></tr>`;
+      }
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">Erro: ${err.message}</td></tr>`;
+    }
+  });
+
+  document.getElementById('panel-pmc-type').addEventListener('change', (e) => {
+    document.getElementById('write-addr-prefix').textContent = e.target.value;
+  });
+
+  document.getElementById('form-panel-pmc-write').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!activeMachineId) return;
+
+    const addressType = document.getElementById('panel-pmc-type').value;
+    const startAddress = Number(document.getElementById('panel-write-address').value);
+    const rawValues = document.getElementById('panel-write-values').value.trim();
+    const dataType = document.getElementById('panel-write-datatype').value;
+
+    const values = rawValues.split(',').map(v => Number(v.trim())).filter(v => !isNaN(v));
+    if (values.length === 0) {
+      alert('Informe ao menos um valor numérico válido.');
+      return;
+    }
+
+    try {
+      log(`[PMC Write] Gravando no CLP da máquina ${activeMachineId}: ${addressType}${startAddress} = [${values.join(', ')}]`, 'log-info');
+      const res = await fetch(`/api/machines/${activeMachineId}/pmc/write`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, address: addr, values, dataType })
+        body: JSON.stringify({ addressType, startAddress, values, dataType })
       });
-      const data = await res.json();
-
-      if (data.success) {
-        showToast(`Valores gravados em ${type}${addr}!`, 'success');
-        log(`Escrita concluída em ${type}${addr}: [${values.join(', ')}]`, 'success');
-        btnPmcRead.click(); // Atualiza tabela de visualização
+      const json = await res.json();
+      if (json.success) {
+        log(`[PMC Write OK] Registrador gravado com sucesso!`, 'log-success');
+        document.getElementById('btn-panel-read-pmc').click();
       } else {
-        showToast(data.error || 'Erro na escrita', 'error');
-        log(`Erro ao escrever no PMC: ${data.error}`, 'error');
+        alert(`Erro na gravação: ${json.error}`);
       }
-    } catch (e) {
-      showToast(e.message, 'error');
+    } catch (err) {
+      log(`[Erro PMC Write] ${err.message}`, 'log-error');
     }
-  };
+  });
 
-  // Leitura de Parâmetro CNC
-  btnParamRead.onclick = async () => {
-    const num = Number(paramNumber.value);
-    const axis = Number(paramAxis.value);
+  // ==================== PARÂMETROS CNC (ABA 4) ====================
+
+  document.getElementById('btn-panel-read-param').addEventListener('click', async () => {
+    if (!activeMachineId) return;
+
+    const paramNumber = Number(document.getElementById('panel-param-num').value);
+    const axis = Number(document.getElementById('panel-param-axis').value);
+    const display = document.getElementById('panel-param-display');
+
+    display.innerHTML = `<span class="spinner" style="width:20px;height:20px;"></span> Lendo parâmetro #${paramNumber}...`;
 
     try {
-      const res = await fetch(`/api/parameter/read?paramNumber=${num}&axis=${axis}`);
-      const data = await res.json();
+      const res = await fetch(`/api/machines/${activeMachineId}/parameter/read?paramNumber=${paramNumber}&axis=${axis}`);
+      const json = await res.json();
 
-      if (data.success && data.data) {
-        const p = data.data;
-        paramResultDisplay.innerHTML = `
-          <strong>Parâmetro #${p.paramNumber}</strong> (Eixo ${p.axis}): 
-          <span style="color: var(--accent-cyan); font-size: 1.1rem; font-weight: bold;">${p.value}</span> 
-          <span class="text-muted">(${p.type})</span>
+      if (json.success && json.data) {
+        display.innerHTML = `
+          <div style="font-size:1.1rem; font-weight:700; color:#fff;">
+            Parâmetro #${paramNumber} (Eixo ${axis}): <span class="highlight">${json.data.value}</span>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.3rem;">
+            Tipo: ${json.data.type || 'Standard'} | Descrição: ${json.data.description || 'Parâmetro CNC Fanuc'}
+          </div>
         `;
-        log(`Parâmetro #${p.paramNumber} (Eixo ${p.axis}) lido: ${p.value}`, 'success');
+        log(`[Parâmetro Read] #${paramNumber} = ${json.data.value} (Máquina ${activeMachineId})`, 'log-success');
       } else {
-        showToast(data.error || 'Erro ao ler parâmetro', 'error');
+        display.innerHTML = `<span class="text-danger">Erro: ${json.error || 'Não foi possível ler o parâmetro'}</span>`;
       }
-    } catch (e) {
-      showToast(e.message, 'error');
+    } catch (err) {
+      display.innerHTML = `<span class="text-danger">Erro: ${err.message}</span>`;
     }
-  };
+  });
 
-  // Escrita de Parâmetro CNC
-  btnParamWrite.onclick = async () => {
-    const num = Number(paramNumber.value);
-    const axis = Number(paramAxis.value);
-    const val = Number(paramValueWrite.value);
+  document.getElementById('btn-panel-write-param').addEventListener('click', async () => {
+    if (!activeMachineId) return;
+
+    const paramNumber = Number(document.getElementById('panel-param-num').value);
+    const axis = Number(document.getElementById('panel-param-axis').value);
+    const value = Number(document.getElementById('panel-param-new-val').value);
+
+    if (isNaN(value)) {
+      alert('Informe um valor numérico válido.');
+      return;
+    }
 
     try {
-      const res = await fetch('/api/parameter/write', {
+      log(`[Parâmetro Write] Gravando #${paramNumber} = ${value} (Eixo ${axis}) na máquina ${activeMachineId}...`, 'log-info');
+      const res = await fetch(`/api/machines/${activeMachineId}/parameter/write`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paramNumber: num, axis, value: val })
+        body: JSON.stringify({ paramNumber, axis, value })
       });
-      const data = await res.json();
+      const json = await res.json();
 
-      if (data.success) {
-        showToast(`Parâmetro #${num} salvo com sucesso!`, 'success');
-        log(`Parâmetro #${num} (Eixo ${axis}) gravado: ${val}`, 'success');
-        btnParamRead.click();
+      if (json.success) {
+        log(`[Parâmetro Write OK] Parâmetro #${paramNumber} gravado com sucesso!`, 'log-success');
+        document.getElementById('btn-panel-read-param').click();
       } else {
-        showToast(data.error || 'Erro ao salvar parâmetro', 'error');
+        alert(`Erro na gravação do parâmetro: ${json.error}`);
+      }
+    } catch (err) {
+      log(`[Erro Parâmetro] ${err.message}`, 'log-error');
+    }
+  });
+
+  // ==================== TAGS SALVAS NO SQLITE (ABA 5) ====================
+
+  async function loadSavedTagsForActiveMachine() {
+    if (!activeMachineId) return;
+    const tbody = document.getElementById('panel-saved-tags-tbody');
+
+    try {
+      const res = await fetch(`/api/machines/${activeMachineId}/pmc/tags`);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        if (json.data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhuma tag cadastrada no banco SQLite para esta máquina.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = json.data.map(t => `
+          <tr>
+            <td><strong>${escapeHtml(t.name)}</strong></td>
+            <td><code>${t.address_type}${t.address}</code></td>
+            <td>${t.data_type}</td>
+            <td>${t.length}</td>
+            <td>${escapeHtml(t.description || '-')}</td>
+            <td>
+              <button class="btn btn-secondary btn-xs btn-del-tag" data-tag-id="${t.id}">🗑️ Excluir</button>
+            </td>
+          </tr>
+        `).join('');
+
+        tbody.querySelectorAll('.btn-del-tag').forEach(btn => {
+          btn.onclick = async () => {
+            const tagId = btn.dataset.tagId;
+            if (confirm('Deseja excluir esta tag do banco de dados SQLite?')) {
+              await fetch(`/api/machines/${activeMachineId}/pmc/tags/${tagId}`, { method: 'DELETE' });
+              await loadSavedTagsForActiveMachine();
+              await loadFleet();
+            }
+          };
+        });
+      }
+    } catch (e) {}
+  }
+
+  // Formulário Adicionar Tag no SQLite
+  document.getElementById('form-add-tag').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!activeMachineId) return;
+
+    const payload = {
+      name: document.getElementById('input-tag-name').value.trim(),
+      address_type: document.getElementById('input-tag-type').value,
+      address: Number(document.getElementById('input-tag-address').value),
+      data_type: document.getElementById('input-tag-datatype').value,
+      description: document.getElementById('input-tag-desc').value.trim()
+    };
+
+    try {
+      const res = await fetch(`/api/machines/${activeMachineId}/pmc/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.success) {
+        modalAddTag.classList.remove('active');
+        document.getElementById('form-add-tag').reset();
+        await loadSavedTagsForActiveMachine();
+        await loadFleet();
+        log(`[SQLite] Nova tag '${payload.name}' salva no banco de dados com sucesso!`, 'log-success');
+      }
+    } catch (err) {
+      alert(`Erro ao salvar tag: ${err.message}`);
+    }
+  });
+
+  // ==================== FUNÇÕES AUXILIARES ====================
+
+  function openMachineModal(machine = null) {
+    const isEdit = Boolean(machine);
+    document.getElementById('modal-machine-title').textContent = isEdit ? '✏️ Editar Máquina CNC' : '➕ Cadastrar Nova Máquina CNC';
+    document.getElementById('input-machine-id').value = isEdit ? machine.id : '';
+    document.getElementById('input-machine-name').value = isEdit ? machine.name : '';
+    document.getElementById('input-machine-model').value = isEdit ? (machine.model || '') : '';
+    document.getElementById('select-machine-driver').value = isEdit ? machine.driver : 'focas_dll';
+    document.getElementById('input-machine-host').value = isEdit ? machine.host : '192.168.1.100';
+    document.getElementById('input-machine-focas-port').value = isEdit ? (machine.focas_port || 8193) : 8193;
+    document.getElementById('input-machine-opcua-port').value = isEdit ? (machine.opcua_port || 4840) : 4840;
+    document.getElementById('input-machine-opcua-endpoint').value = isEdit ? (machine.opcua_endpoint || '') : '';
+    document.getElementById('input-machine-username').value = isEdit ? (machine.username || 'OpcUaClient') : 'OpcUaClient';
+    document.getElementById('input-machine-password').value = isEdit ? (machine.password || 'OpcUaClient') : 'OpcUaClient';
+    document.getElementById('input-machine-timeout').value = isEdit ? (machine.timeout || 5000) : 5000;
+
+    driverSelect.dispatchEvent(new Event('change'));
+    modalMachineConfig.classList.add('active');
+  }
+
+  function closeModal(modal) {
+    modal.classList.remove('active');
+  }
+
+  async function deleteMachine(id) {
+    try {
+      const res = await fetch(`/api/machines/${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        log(`[SQLite] Máquina ID ${id} excluída do banco de dados.`, 'log-info');
+        await loadFleet();
       }
     } catch (e) {
-      showToast(e.message, 'error');
+      log(`[Erro] Falha ao excluir máquina: ${e.message}`, 'log-error');
     }
-  };
+  }
 
-  // Limpar Logs
-  document.getElementById('btn-clear-logs').onclick = () => {
-    logsConsole.innerHTML = '';
-  };
-}
+  function log(msg, type = 'log-info') {
+    const time = new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = `log-entry ${type}`;
+    div.textContent = `[${time}] ${msg}`;
+    terminalLogs.prepend(div);
+    if (terminalLogs.children.length > 50) {
+      terminalLogs.removeChild(terminalLogs.lastChild);
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ==================== WEBSOCKET AO VIVO ====================
+
+  function initWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      log('[WebSocket] Conexão em tempo real estabelecida com o servidor.', 'log-success');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'fleet_telemetry' && msg.fleet) {
+          // Atualiza dados ao vivo das máquinas
+          msg.fleet.forEach(item => {
+            const found = fleetData.find(m => m.id === item.machineId);
+            if (found) {
+              found.liveStatus = item.status;
+              found.monitoredTags = item.monitoredTags;
+            }
+          });
+
+          renderFleetGrid(fleetData);
+          updateFleetStats(fleetData);
+
+          if (activeMachineId) {
+            const current = fleetData.find(m => m.id === activeMachineId);
+            if (current) updateActiveMachineView(current);
+          }
+        }
+      } catch (e) {}
+    };
+
+    ws.onclose = () => {
+      setTimeout(initWebSocket, 3000);
+    };
+  }
+
+  // Inicialização
+  loadFleet();
+  initWebSocket();
+});

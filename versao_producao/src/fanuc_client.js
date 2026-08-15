@@ -141,12 +141,15 @@ class FanucClient extends EventEmitter {
 
     // Enriquece o resultado com decodificação binária se for Byte
     if (res.dataType === 'Byte' && res.values) {
-      res.bits = res.values.map((byteVal, idx) => ({
-        address: `${res.addressType}${res.startAddress + idx}`,
-        byteValue: byteVal,
-        binaryString: byteVal.toString(2).padStart(8, '0'),
-        bits: this.decodeBits(byteVal)
-      }));
+      res.bits = res.values.map((byteVal, idx) => {
+        const num = typeof byteVal === 'number' ? byteVal : (Number(byteVal) || 0);
+        return {
+          address: `${res.addressType}${res.startAddress + idx}`,
+          byteValue: num,
+          binaryString: num.toString(2).padStart(8, '0'),
+          bits: this.decodeBits(num)
+        };
+      });
     }
 
     return res;
