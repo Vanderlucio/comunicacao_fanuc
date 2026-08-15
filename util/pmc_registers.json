@@ -1,0 +1,142 @@
+{
+  "pmcAddressTypes": [
+    {
+      "type": "R",
+      "name": "Internal Relays (Relés Internos)",
+      "focasTypeCode": 5,
+      "access": "RW",
+      "defaultRange": "R0 a R9999",
+      "description": "Área de memória interna de trabalho do Ladder / CLP. Usada para flags de ciclo, intertravamentos, permissões de usinagem, controle de avanço e comandos auxiliares M/S/T.",
+      "commonAddresses": [
+        {
+          "address": 1000,
+          "name": "R1000 - Status Geral da Automação",
+          "description": "Bits R1000.0 a R1000.7 frequentemente mapeados para ciclo automático, porta fechada, lubrificação ok, etc."
+        },
+        {
+          "address": 1001,
+          "name": "R1001 - Modos de Segurança e Permissões",
+          "description": "Bits de intertravamento de segurança, permissão de troca de ferramenta e trava de eixo."
+        }
+      ]
+    },
+    {
+      "type": "D",
+      "name": "Data Tables (Tabelas de Dados)",
+      "focasTypeCode": 9,
+      "access": "RW",
+      "defaultRange": "D0 a D9999",
+      "description": "Registradores de dados numéricos retentivos de 16 bits (Word) ou 32 bits (Long). Usados para receitas de peças, contadores de produção, tempos de ciclo, números de ferramenta no magazine e parâmetros do fabricante da máquina.",
+      "commonAddresses": [
+        {
+          "address": 0,
+          "name": "D0 - Temporizadores Customizados / Tabela Base",
+          "description": "Tempos de lubrificação, atrasos de válvulas e despressurização."
+        },
+        {
+          "address": 500,
+          "name": "D500 - Dados de Ordem / Peças do Turno",
+          "description": "Número do lote, ordem de produção e totalizador de peças do turno atual."
+        }
+      ]
+    },
+    {
+      "type": "X",
+      "name": "Physical Inputs (Entradas Digitais Físicas)",
+      "focasTypeCode": 1,
+      "access": "R",
+      "defaultRange": "X0 a X127",
+      "description": "Sinais elétricos de 24V DC vindos do painel do operador e sensores da máquina (Botoeiras de Ciclo Start, Parada, Emergência, Fins de curso de eixo, Sensores de porta fechada, Pressostatos de óleo/ar).",
+      "commonAddresses": [
+        {
+          "address": 0,
+          "name": "X0 - Painel Principal do Operador",
+          "description": "X0.0=Cycle Start, X0.1=Feed Hold, X0.2=Modo Auto, X0.3=Modo Manual/Jog, X0.4=Reset, X0.5=Zero Return."
+        },
+        {
+          "address": 4,
+          "name": "X4 - Sensores de Segurança e Portas",
+          "description": "X4.0=Porta da cabine fechada, X4.1=Pressão de ar pneumática OK, X4.2=Nível de óleo refrigerante OK."
+        }
+      ]
+    },
+    {
+      "type": "Y",
+      "name": "Physical Outputs (Saídas Digitais Físicas)",
+      "focasTypeCode": 2,
+      "access": "RW",
+      "defaultRange": "Y0 a Y127",
+      "description": "Saídas elétricas de 24V DC que acionam relés, contatores, válvulas solenoides pneumáticas/hidráulicas, bomba de refrigerante (M08), iluminação, trava da porta e torre de sinalização luminosa (Verde/Amarelo/Vermelho).",
+      "commonAddresses": [
+        {
+          "address": 0,
+          "name": "Y0 - Atuadores de Usinagem Principais",
+          "description": "Y0.0=Ligar Bomba de Refrigeração (M08), Y0.1=Travar Placa/Morsa, Y0.2=Destravar Morsa, Y0.3=Torre Verde (Operação), Y0.4=Torre Vermelha (Alarme)."
+        }
+      ]
+    },
+    {
+      "type": "K",
+      "name": "Keep Relays (Relés de Retenção)",
+      "focasTypeCode": 4,
+      "access": "RW",
+      "defaultRange": "K0 a K99",
+      "description": "Parâmetros não-voláteis do CLP configurados pelo fabricante da máquina (OEM). Determinam opções como desabilitar sensor de porta, selecionar tipo de trocador de ferramenta (guarda-chuva ou braço), habilitar lavador de cavacos contínuo, etc.",
+      "commonAddresses": [
+        {
+          "address": 0,
+          "name": "K0 - Opções de Operação e Segurança OEM",
+          "description": "K0.0=Habilita abertura de porta em modo manual, K0.1=Habilita sopro de ar durante troca de ferramenta."
+        }
+      ]
+    },
+    {
+      "type": "G",
+      "name": "CNC to PMC Signals (Sinais do CNC para o CLP)",
+      "focasTypeCode": 0,
+      "access": "R",
+      "defaultRange": "G0 a G255",
+      "description": "Interface interna de sinais transmitidos pelo controle numérico CNC para o Ladder do PMC (ex: código M executado, código S de rotação, status de movimento do eixo, parada de bloco).",
+      "commonAddresses": [
+        {
+          "address": 4,
+          "name": "G4 - Sinais de Decodificação de Código M",
+          "description": "G4.0=Sinal de strobe de M Code (MF), G4.1=SF, G4.2=TF."
+        },
+        {
+          "address": 8,
+          "name": "G8 - Código M Atual",
+          "description": "Byte contendo o valor do código M em execução (ex: 3=M03, 8=M08, 9=M09)."
+        }
+      ]
+    },
+    {
+      "type": "F",
+      "name": "PMC to CNC Signals (Sinais do CLP para o CNC)",
+      "focasTypeCode": 3,
+      "access": "RW",
+      "defaultRange": "F0 a F255",
+      "description": "Interface de sinais enviados pelo Ladder do PMC para comandar o CNC (ex: permissão de ciclo start, bloqueio de avanço, finalização de código M com sinal FIN, override de avanço de 0 a 200%).",
+      "commonAddresses": [
+        {
+          "address": 0,
+          "name": "F0 - Sinais de Controle de Ciclo",
+          "description": "F0.0=*SP (Parada de avanço), F0.5=FIN (Conclusão de comando auxiliar M/S/T)."
+        },
+        {
+          "address": 12,
+          "name": "F12 - Chave de Override de Avanço",
+          "description": "Byte com o valor percentual de override de avanço (0% a 200%)."
+        }
+      ]
+    },
+    {
+      "type": "A",
+      "name": "Alarm Messages (Mensagens de Alarme do CLP)",
+      "focasTypeCode": 8,
+      "access": "RW",
+      "defaultRange": "A0 a A25",
+      "description": "Bits de acionamento de alarmes personalizados gerados pelo fabricante (ex: A0.0 aciona o alarme EX1000 'Falta de Pressão de Óleo', A0.1 aciona EX1001 'Porta Aberta durante Ciclo')."
+    }
+  ]
+}
