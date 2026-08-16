@@ -583,6 +583,25 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL 4: CONFIRMAÇÃO DE EXCLUSÃO ==================== -->
+  <div class="modal-backdrop" id="modal-confirm-delete">
+    <div class="modal-window" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="confirm-delete-title">🗑️ Confirmar Exclusão</h3>
+        <button class="modal-close" id="btn-close-confirm-delete">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-delete-msg" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main);">
+          Tem certeza que deseja excluir este item do banco de dados SQLite?
+        </p>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-confirm-delete">Cancelar</button>
+          <button type="button" class="btn btn-danger" id="btn-action-confirm-delete">Sim, Excluir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

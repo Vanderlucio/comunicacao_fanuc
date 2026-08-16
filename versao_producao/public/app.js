@@ -20,6 +20,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const modalMachineConfig = document.getElementById('modal-machine-config');
   const modalMachinePanel = document.getElementById('modal-machine-panel');
   const modalAddTag = document.getElementById('modal-add-tag');
+  const modalConfirmDelete = document.getElementById('modal-confirm-delete');
+  const confirmDeleteMsg = document.getElementById('confirm-delete-msg');
+  const confirmDeleteTitle = document.getElementById('confirm-delete-title');
+  const btnActionConfirmDelete = document.getElementById('btn-action-confirm-delete');
+  const btnCancelConfirmDelete = document.getElementById('btn-cancel-confirm-delete');
+  const btnCloseConfirmDelete = document.getElementById('btn-close-confirm-delete');
+
+  let onConfirmCallback = null;
+
+  function showConfirmModal({ title, message, onConfirm }) {
+    if (confirmDeleteTitle) confirmDeleteTitle.textContent = title || '🗑️ Confirmar Exclusão';
+    if (confirmDeleteMsg) confirmDeleteMsg.innerHTML = message || 'Tem certeza que deseja excluir?';
+    onConfirmCallback = onConfirm;
+    modalConfirmDelete.classList.add('active');
+  }
+
+  function closeConfirmModal() {
+    modalConfirmDelete.classList.remove('active');
+    onConfirmCallback = null;
+  }
+
+  btnCancelConfirmDelete.addEventListener('click', closeConfirmModal);
+  btnCloseConfirmDelete.addEventListener('click', closeConfirmModal);
+  btnActionConfirmDelete.addEventListener('click', async () => {
+    if (typeof onConfirmCallback === 'function') {
+      const cb = onConfirmCallback;
+      closeConfirmModal();
+      await cb();
+    } else {
+      closeConfirmModal();
+    }
+  });
 
   // Botões Globais
   document.getElementById('btn-open-add-machine').addEventListener('click', () => openMachineModal());
@@ -273,12 +305,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.querySelectorAll('.btn-delete-machine').forEach(b => {
-      b.addEventListener('click', async (e) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = Number(e.currentTarget.dataset.id);
         const m = fleetData.find(x => x.id === id);
-        if (confirm(`Deseja realmente excluir a máquina '${m ? m.name : id}' do banco de dados SQLite?`)) {
-          await deleteMachine(id);
-        }
+        const machineName = m ? m.name : `ID ${id}`;
+
+        showConfirmModal({
+          title: '🗑️ Excluir Máquina CNC',
+          message: `Deseja realmente excluir a máquina <strong>${escapeHtml(machineName)}</strong> e todas as suas tags cadastradas do banco de dados SQLite?`,
+          onConfirm: async () => {
+            await deleteMachine(id);
+          }
+        });
       });
     });
   }
@@ -457,15 +496,33 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     });
 
-    // Event Listeners de Exclusão de Tags
+    // Event Listeners de Exclusão de Tags (com Modal Customizado de Confirmação)
     document.querySelectorAll('.btn-delete-tag').forEach(btn => {
-      btn.onclick = async () => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
         const tagId = btn.dataset.tagId;
-        if (confirm('Deseja excluir esta tag do banco de dados SQLite?')) {
-          await fetch(`/api/machines/${machine.id}/pmc/tags/${tagId}`, { method: 'DELETE' });
-          await loadFleet();
-          log(`[SQLite] Tag ID ${tagId} removida.`, 'log-info');
-        }
+        const tagObj = tags.find(t => (t.tag && String(t.tag.id) === String(tagId)) || (t.id && String(t.id) === String(tagId)));
+        const tagName = tagObj && tagObj.tag ? tagObj.tag.name : (tagObj ? tagObj.name : `ID ${tagId}`);
+        const tagAddr = tagObj && tagObj.tag ? `${tagObj.tag.address_type}${tagObj.tag.address}` : '';
+
+        showConfirmModal({
+          title: '🗑️ Excluir Tag do CLP',
+          message: `Deseja realmente excluir a tag <strong>${escapeHtml(tagName)}</strong> ${tagAddr ? `(<code>${tagAddr}</code>)` : ''} do banco de dados SQLite?`,
+          onConfirm: async () => {
+            try {
+              const res = await fetch(`/api/machines/${machine.id}/pmc/tags/${tagId}`, { method: 'DELETE' });
+              const json = await res.json();
+              if (json.success) {
+                log(`[SQLite] Tag '${tagName}' excluída com sucesso.`, 'log-info');
+                await loadFleet();
+              } else {
+                alert(`Erro ao excluir tag: ${json.error}`);
+              }
+            } catch (err) {
+              log(`[Erro] Falha ao excluir tag: ${err.message}`, 'log-error');
+            }
+          }
+        });
       };
     });
   }
