@@ -41,6 +41,7 @@ class DatabaseManager {
       this.isNativeSqlite = true;
       console.log(`[Database] SQLite nativo conectado em: ${this.dbPath}`);
       await this.createTablesSqlite();
+      await this.migrateSchemaSqlite();
     } catch (err) {
       console.warn(`[Database] Usando storage persistente JSON/SQLite: ${err.message}`);
       this.isNativeSqlite = false;
@@ -74,10 +75,12 @@ class DatabaseManager {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         machine_id INTEGER NOT NULL,
         name TEXT NOT NULL,
+        direction TEXT NOT NULL DEFAULT 'READ',
         address_type TEXT NOT NULL,
         address INTEGER NOT NULL,
         length INTEGER NOT NULL DEFAULT 1,
         data_type TEXT NOT NULL DEFAULT 'Byte',
+        write_value TEXT DEFAULT '0',
         description TEXT,
         created_at TEXT,
         FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE
@@ -101,6 +104,12 @@ class DatabaseManager {
         else resolve();
       });
     });
+  }
+
+  async migrateSchemaSqlite() {
+    const runSafe = (sql) => new Promise(res => this.db.run(sql, () => res()));
+    await runSafe(`ALTER TABLE machine_pmc_tags ADD COLUMN direction TEXT DEFAULT 'READ';`);
+    await runSafe(`ALTER TABLE machine_pmc_tags ADD COLUMN write_value TEXT DEFAULT '0';`);
   }
 
   loadFallbackData() {
@@ -140,12 +149,16 @@ class DatabaseManager {
 
       const mId = defaultMachine.id;
 
-      // Tags de PMC padrão
-      await this.addPmcTag(mId, { name: 'Status_Geral', address_type: 'R', address: 1000, length: 4, data_type: 'Byte', description: 'Relés internos de status' });
-      await this.addPmcTag(mId, { name: 'Entradas_Painel', address_type: 'X', address: 0, length: 2, data_type: 'Byte', description: 'Entradas físicas digitais' });
-      await this.addPmcTag(mId, { name: 'Saidas_Valvulas', address_type: 'Y', address: 0, length: 2, data_type: 'Byte', description: 'Saídas físicas digitais' });
-      await this.addPmcTag(mId, { name: 'Keep_Relays', address_type: 'K', address: 0, length: 4, data_type: 'Byte', description: 'Parâmetros retentivos' });
-      await this.addPmcTag(mId, { name: 'Tabela_D500', address_type: 'D', address: 500, length: 2, data_type: 'Word', description: 'Registradores numéricos D500' });
+      // Tags de Leitura (READ)
+      await this.addPmcTag(mId, { name: 'Status_Geral', direction: 'READ', address_type: 'R', address: 1000, length: 4, data_type: 'Byte', description: 'Relés internos de status' });
+      await this.addPmcTag(mId, { name: 'Entradas_Painel', direction: 'READ', address_type: 'X', address: 0, length: 2, data_type: 'Byte', description: 'Entradas físicas digitais' });
+      await this.addPmcTag(mId, { name: 'Saidas_Monitoradas', direction: 'READ', address_type: 'Y', address: 0, length: 2, data_type: 'Byte', description: 'Monitoramento de saídas' });
+      await this.addPmcTag(mId, { name: 'Keep_Relays', direction: 'READ', address_type: 'K', address: 0, length: 4, data_type: 'Byte', description: 'Parâmetros retentivos' });
+      await this.addPmcTag(mId, { name: 'Tabela_D500', direction: 'READ', address_type: 'D', address: 500, length: 2, data_type: 'Word', description: 'Registradores numéricos D500' });
+
+      // Tags de Escrita (WRITE)
+      await this.addPmcTag(mId, { name: 'Comando_Soltar_Placa', direction: 'WRITE', address_type: 'Y', address: 0, length: 1, data_type: 'Byte', write_value: '1', description: 'Ativa soltura de placa' });
+      await this.addPmcTag(mId, { name: 'Rele_Liberacao_Ciclo', direction: 'WRITE', address_type: 'R', address: 1002, length: 1, data_type: 'Byte', write_value: '255', description: 'Pulso de liberação de ciclo' });
 
       // Parâmetros CNC padrão
       await this.addParameter(mId, { param_number: 4000, axis: 0, name: 'Param_Sistema', description: 'Configuração geral CNC' });
@@ -310,45 +323,62 @@ class DatabaseManager {
     }
   }
 
-  // ==================== PMC TAGS (CRUD) ====================
+  // ==================== PMC TAGS (CRUD & FILTROS) ====================
 
-  async getPmcTagsByMachine(machineId) {
+  async getPmcTagsByMachine(machineId, direction = null) {
     machineId = Number(machineId);
     if (this.isNativeSqlite) {
       return new Promise((resolve, reject) => {
-        this.db.all('SELECT * FROM machine_pmc_tags WHERE machine_id = ? ORDER BY id ASC', [machineId], (err, rows) => {
+        let sql = 'SELECT * FROM machine_pmc_tags WHERE machine_id = ?';
+        const params = [machineId];
+        if (direction) {
+          sql += ' AND direction = ?';
+          params.push(direction.toUpperCase());
+        }
+        sql += ' ORDER BY id ASC';
+
+        this.db.all(sql, params, (err, rows) => {
           if (err) reject(err);
           else resolve(rows || []);
         });
       });
     } else {
-      return this.fallbackData.machine_pmc_tags.filter(t => t.machine_id === machineId);
+      return this.fallbackData.machine_pmc_tags.filter(t => {
+        if (t.machine_id !== machineId) return false;
+        if (direction && (t.direction || 'READ').toUpperCase() !== direction.toUpperCase()) return false;
+        return true;
+      });
     }
   }
 
   async addPmcTag(machineId, data) {
     machineId = Number(machineId);
     const now = new Date().toISOString();
+    const direction = (data.direction || 'READ').toUpperCase();
+    const writeValue = data.write_value !== undefined ? String(data.write_value) : (data.writeValue !== undefined ? String(data.writeValue) : '0');
+
     if (this.isNativeSqlite) {
       return new Promise((resolve, reject) => {
         const sql = `
-          INSERT INTO machine_pmc_tags (machine_id, name, address_type, address, length, data_type, description, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO machine_pmc_tags (machine_id, name, direction, address_type, address, length, data_type, write_value, description, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const params = [
           machineId,
           data.name || 'Nova Tag',
+          direction,
           data.address_type || data.addressType || 'R',
           Number(data.address !== undefined ? data.address : 1000),
           Number(data.length || 1),
           data.data_type || data.dataType || 'Byte',
+          writeValue,
           data.description || '',
           now
         ];
 
         this.db.run(sql, params, function(err) {
           if (err) reject(err);
-          else resolve({ id: this.lastID, machine_id: machineId, ...data, created_at: now });
+          else resolve({ id: this.lastID, machine_id: machineId, direction, write_value: writeValue, ...data, created_at: now });
         });
       });
     } else {
@@ -357,16 +387,63 @@ class DatabaseManager {
         id: nextId,
         machine_id: machineId,
         name: data.name || 'Nova Tag',
+        direction,
         address_type: data.address_type || data.addressType || 'R',
         address: Number(data.address !== undefined ? data.address : 1000),
         length: Number(data.length || 1),
         data_type: data.data_type || data.dataType || 'Byte',
+        write_value: writeValue,
         description: data.description || '',
         created_at: now
       };
       this.fallbackData.machine_pmc_tags.push(newTag);
       this.saveFallbackData();
       return newTag;
+    }
+  }
+
+  async updatePmcTag(tagId, data) {
+    tagId = Number(tagId);
+    if (this.isNativeSqlite) {
+      return new Promise((resolve, reject) => {
+        const sql = `
+          UPDATE machine_pmc_tags SET
+            name = COALESCE(?, name),
+            direction = COALESCE(?, direction),
+            address_type = COALESCE(?, address_type),
+            address = COALESCE(?, address),
+            length = COALESCE(?, length),
+            data_type = COALESCE(?, data_type),
+            write_value = COALESCE(?, write_value),
+            description = COALESCE(?, description)
+          WHERE id = ?
+        `;
+        const params = [
+          data.name,
+          data.direction ? data.direction.toUpperCase() : undefined,
+          data.address_type || data.addressType,
+          data.address !== undefined ? Number(data.address) : undefined,
+          data.length !== undefined ? Number(data.length) : undefined,
+          data.data_type || data.dataType,
+          data.write_value !== undefined ? String(data.write_value) : (data.writeValue !== undefined ? String(data.writeValue) : undefined),
+          data.description,
+          tagId
+        ];
+
+        this.db.run(sql, params, function(err) {
+          if (err) reject(err);
+          else resolve({ success: this.changes > 0 });
+        });
+      });
+    } else {
+      const idx = this.fallbackData.machine_pmc_tags.findIndex(t => t.id === tagId);
+      if (idx === -1) return { success: false };
+      this.fallbackData.machine_pmc_tags[idx] = {
+        ...this.fallbackData.machine_pmc_tags[idx],
+        ...data
+      };
+      this.saveFallbackData();
+      return { success: true };
     }
   }
 

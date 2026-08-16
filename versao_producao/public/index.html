@@ -62,7 +62,6 @@
 
       <!-- Grid de Cards de Máquinas -->
       <div class="fleet-grid" id="fleet-grid">
-        <!-- Cards gerados dinamicamente pelo JavaScript -->
         <div class="loading-state">
           <div class="spinner"></div>
           <span>Carregando máquinas do banco de dados SQLite...</span>
@@ -194,15 +193,182 @@
 
         <!-- Abas de Operação da Máquina -->
         <div class="panel-tabs">
-          <button class="panel-tab active" data-tab="tab-telemetry">⚡ Telemetria & Eixos</button>
+          <button class="panel-tab active" data-tab="tab-pmc">🎛️ Leitura & Escrita de Tags (PMC)</button>
+          <button class="panel-tab" data-tab="tab-telemetry">⚡ Telemetria & Eixos</button>
           <button class="panel-tab" data-tab="tab-io">🔌 Painel de Bits (I/O)</button>
-          <button class="panel-tab" data-tab="tab-pmc">🎛️ Leitura & Escrita PMC</button>
           <button class="panel-tab" data-tab="tab-params">⚙️ Parâmetros CNC</button>
-          <button class="panel-tab" data-tab="tab-saved-tags">🏷️ Tags Salvas no Banco</button>
         </div>
 
-        <!-- ABA 1: TELEMETRIA & EIXOS -->
-        <div class="tab-content active" id="tab-telemetry">
+        <!-- ABA 1: LEITURA & ESCRITA DE TAGS PMC (PRINCIPAL) -->
+        <div class="tab-content active" id="tab-pmc">
+          
+          <!-- SEÇÃO: TAGS DE LEITURA (CICLO AUTOMÁTICO / REFRESH) -->
+          <div class="pmc-section-block">
+            <div class="section-subhead">
+              <div>
+                <h4 class="subhead-title">📥 Tags de Leitura Automática (Atualizadas a Cada Refresh)</h4>
+                <p class="subhead-desc">Tags persistidas no SQLite que são lidas ciclicamente em tempo real do CLP desta máquina.</p>
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-open-add-read-tag">
+                ➕ Adicionar Tag de Leitura
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Nome da Tag</th>
+                    <th>Endereço</th>
+                    <th>Tipo</th>
+                    <th>Valor Atual (Decimal)</th>
+                    <th>Valor (Hex)</th>
+                    <th>Bits (7..0)</th>
+                    <th>Descrição</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-read-tags">
+                  <tr>
+                    <td colspan="8" class="text-center text-muted">Carregando tags de leitura do SQLite...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SEÇÃO: TAGS DE ESCRITA (COMANDOS & SETPOINTS NO CLP) -->
+          <div class="pmc-section-block">
+            <div class="section-subhead">
+              <div>
+                <h4 class="subhead-title">📤 Tags de Escrita Cadastradas (Comandos & Setpoints)</h4>
+                <p class="subhead-desc">Tags de controle persistidas no SQLite para envio rápido de valores e acionamentos no CLP.</p>
+              </div>
+              <button class="btn btn-danger btn-sm" id="btn-open-add-write-tag">
+                ➕ Adicionar Tag de Escrita
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Nome do Comando</th>
+                    <th>Endereço</th>
+                    <th>Tipo</th>
+                    <th>Valor Configurado</th>
+                    <th>Disparo / Execução</th>
+                    <th>Descrição</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-write-tags">
+                  <tr>
+                    <td colspan="7" class="text-center text-muted">Carregando tags de escrita do SQLite...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SEÇÃO: LEITURA & ESCRITA PONTUAL / DIAGNÓSTICO -->
+          <div class="pmc-section-block-collapsible">
+            <details>
+              <summary class="collapsible-summary">🔧 Diagnóstico / Teste Manual de Registradores Avulsos</summary>
+              <div class="card-body-pmc" style="margin-top: 1rem;">
+                <form id="form-panel-pmc-read" class="form-row">
+                  <div class="form-group flex-1">
+                    <label>Tipo de Endereço</label>
+                    <select id="panel-pmc-type" class="form-control">
+                      <option value="R" selected>R - Relés Internos</option>
+                      <option value="D">D - Tabela de Dados</option>
+                      <option value="X">X - Entradas Digitais</option>
+                      <option value="Y">Y - Saídas Digitais</option>
+                      <option value="K">K - Keep Relays</option>
+                      <option value="G">G - Sinais CNC -> PMC</option>
+                      <option value="F">F - Sinais PMC -> CNC</option>
+                      <option value="A">A - Alarmes do CLP</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>Endereço Inicial</label>
+                    <input type="number" id="panel-pmc-address" class="form-control" value="1000" min="0">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>Quantidade</label>
+                    <input type="number" id="panel-pmc-count" class="form-control" value="4" min="1" max="100">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>Tipo de Dado</label>
+                    <select id="panel-pmc-datatype" class="form-control">
+                      <option value="Byte" selected>Byte (8 bits)</option>
+                      <option value="Word">Word (16 bits)</option>
+                      <option value="Long">Long (32 bits)</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-auto align-end">
+                    <button type="submit" class="btn btn-secondary" id="btn-panel-read-pmc">
+                      🔍 Leitura Manual
+                    </button>
+                  </div>
+                </form>
+
+                <div class="table-responsive">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Endereço</th>
+                        <th>Valor (Decimal)</th>
+                        <th>Valor (Hex)</th>
+                        <th>Representação em Bits (7 -> 0)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="panel-pmc-results-tbody">
+                      <tr>
+                        <td colspan="4" class="text-center text-muted">Execute uma leitura manual para testar.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Escrita Avulsa -->
+                <div class="write-box">
+                  <h4 class="write-box-title">✍️ Escrita Manual Avulsa</h4>
+                  <form id="form-panel-pmc-write" class="form-row">
+                    <div class="form-group flex-1">
+                      <label>Tipo e Endereço</label>
+                      <div class="input-group">
+                        <span class="input-prefix" id="write-addr-prefix">R</span>
+                        <input type="number" id="panel-write-address" class="form-control" value="1000">
+                      </div>
+                    </div>
+                    <div class="form-group flex-2">
+                      <label>Valores (separe por vírgula para múltiplos)</label>
+                      <input type="text" id="panel-write-values" class="form-control" placeholder="Ex: 255 ou 10, 20, 30">
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>Tipo de Dado</label>
+                      <select id="panel-write-datatype" class="form-control">
+                        <option value="Byte" selected>Byte</option>
+                        <option value="Word">Word</option>
+                        <option value="Long">Long</option>
+                      </select>
+                    </div>
+                    <div class="form-group flex-auto align-end">
+                      <button type="submit" class="btn btn-danger" id="btn-panel-write-pmc">
+                        ⚡ Escrever Avulso
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </details>
+          </div>
+
+        </div>
+
+        <!-- ABA 2: TELEMETRIA & EIXOS -->
+        <div class="tab-content" id="tab-telemetry">
           <div class="telemetry-grid-large">
             <div class="telemetry-box">
               <span class="t-label">Modo de Operação</span>
@@ -259,13 +425,12 @@
           </div>
         </div>
 
-        <!-- ABA 2: PAINEL DE BITS (I/O) -->
+        <!-- ABA 3: PAINEL DE BITS (I/O) -->
         <div class="tab-content" id="tab-io">
           <div class="bitfield-desc">
             Clique nos bits de saídas físicas (Y) ou relés (R) para alternar o estado na máquina selecionada.
           </div>
           <div class="bit-groups-grid">
-            <!-- Entradas X0 -->
             <div class="bit-panel-box">
               <div class="bit-panel-header">
                 <span class="bit-panel-title">Entradas Digitais (X0)</span>
@@ -274,7 +439,6 @@
               <div class="bit-matrix" id="panel-matrix-x0"></div>
             </div>
 
-            <!-- Saídas Y0 -->
             <div class="bit-panel-box">
               <div class="bit-panel-header">
                 <span class="bit-panel-title">Saídas Físicas (Y0)</span>
@@ -283,7 +447,6 @@
               <div class="bit-matrix" id="panel-matrix-y0"></div>
             </div>
 
-            <!-- Relés R1000 -->
             <div class="bit-panel-box">
               <div class="bit-panel-header">
                 <span class="bit-panel-title">Relés Internos (R1000)</span>
@@ -292,105 +455,12 @@
               <div class="bit-matrix" id="panel-matrix-r1000"></div>
             </div>
 
-            <!-- Keep Relays K0 -->
             <div class="bit-panel-box">
               <div class="bit-panel-header">
                 <span class="bit-panel-title">Keep Relays (K0)</span>
                 <span class="bit-byte-label" id="panel-byte-k0">Valor: ---</span>
               </div>
               <div class="bit-matrix" id="panel-matrix-k0"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ABA 3: LEITURA E ESCRITA DO PMC (CLP) -->
-        <div class="tab-content" id="tab-pmc">
-          <div class="card-body-pmc">
-            <form id="form-panel-pmc-read" class="form-row">
-              <div class="form-group flex-1">
-                <label>Tipo de Endereço</label>
-                <select id="panel-pmc-type" class="form-control">
-                  <option value="R" selected>R - Relés Internos</option>
-                  <option value="D">D - Tabela de Dados</option>
-                  <option value="X">X - Entradas Digitais</option>
-                  <option value="Y">Y - Saídas Digitais</option>
-                  <option value="K">K - Keep Relays</option>
-                  <option value="G">G - Sinais CNC -> PMC</option>
-                  <option value="F">F - Sinais PMC -> CNC</option>
-                  <option value="A">A - Alarmes do CLP</option>
-                </select>
-              </div>
-              <div class="form-group flex-1">
-                <label>Endereço Inicial</label>
-                <input type="number" id="panel-pmc-address" class="form-control" value="1000" min="0">
-              </div>
-              <div class="form-group flex-1">
-                <label>Quantidade</label>
-                <input type="number" id="panel-pmc-count" class="form-control" value="4" min="1" max="100">
-              </div>
-              <div class="form-group flex-1">
-                <label>Tipo de Dado</label>
-                <select id="panel-pmc-datatype" class="form-control">
-                  <option value="Byte" selected>Byte (8 bits)</option>
-                  <option value="Word">Word (16 bits)</option>
-                  <option value="Long">Long (32 bits)</option>
-                </select>
-              </div>
-              <div class="form-group flex-auto align-end">
-                <button type="submit" class="btn btn-primary" id="btn-panel-read-pmc">
-                  🔍 Ler do CLP
-                </button>
-              </div>
-            </form>
-
-            <!-- Tabela de Resultados do PMC -->
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Endereço</th>
-                    <th>Valor (Decimal)</th>
-                    <th>Valor (Hex)</th>
-                    <th>Representação em Bits (7 -> 0)</th>
-                  </tr>
-                </thead>
-                <tbody id="panel-pmc-results-tbody">
-                  <tr>
-                    <td colspan="4" class="text-center text-muted">Selecione o endereço e clique em 'Ler do CLP'.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Escrita no PMC -->
-            <div class="write-box">
-              <h4 class="write-box-title">✍️ Escrever no CLP da Máquina</h4>
-              <form id="form-panel-pmc-write" class="form-row">
-                <div class="form-group flex-1">
-                  <label>Tipo e Endereço</label>
-                  <div class="input-group">
-                    <span class="input-prefix" id="write-addr-prefix">R</span>
-                    <input type="number" id="panel-write-address" class="form-control" value="1000">
-                  </div>
-                </div>
-                <div class="form-group flex-2">
-                  <label>Valores (separe por vírgula para múltiplos)</label>
-                  <input type="text" id="panel-write-values" class="form-control" placeholder="Ex: 255 ou 10, 20, 30">
-                </div>
-                <div class="form-group flex-1">
-                  <label>Tipo de Dado</label>
-                  <select id="panel-write-datatype" class="form-control">
-                    <option value="Byte" selected>Byte</option>
-                    <option value="Word">Word</option>
-                    <option value="Long">Long</option>
-                  </select>
-                </div>
-                <div class="form-group flex-auto align-end">
-                  <button type="submit" class="btn btn-danger" id="btn-panel-write-pmc">
-                    ⚡ Escrever no CLP
-                  </button>
-                </div>
-              </form>
             </div>
           </div>
         </div>
@@ -418,7 +488,6 @@
               <span class="text-muted">Informe o parâmetro e clique em ler.</span>
             </div>
 
-            <!-- Escrita de Parâmetro -->
             <div class="write-box">
               <h4 class="write-box-title">✍️ Escrever Parâmetro CNC</h4>
               <div class="form-row">
@@ -436,49 +505,37 @@
           </div>
         </div>
 
-        <!-- ABA 5: TAGS SALVAS NO SQLITE -->
-        <div class="tab-content" id="tab-saved-tags">
-          <div class="saved-tags-container">
-            <div class="tags-header">
-              <h4 class="tags-title">Tags de PMC Cadastradas no Banco de Dados SQLite</h4>
-              <button class="btn btn-secondary btn-sm" id="btn-add-tag-modal">➕ Nova Tag</button>
-            </div>
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>Endereço</th>
-                    <th>Tipo</th>
-                    <th>Tamanho</th>
-                    <th>Descrição</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody id="panel-saved-tags-tbody">
-                  <!-- Tags carregadas do SQLite -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   </div>
 
-  <!-- MODAL SECUNDÁRIO: ADICIONAR TAG NO SQLITE -->
+  <!-- ==================== MODAL 3: ADICIONAR TAG (LEITURA OU ESCRITA) ==================== -->
   <div class="modal-backdrop" id="modal-add-tag">
     <div class="modal-window">
       <div class="modal-header">
-        <h3 class="modal-title">🏷️ Cadastrar Tag de PMC no SQLite</h3>
+        <h3 class="modal-title" id="modal-tag-title">🏷️ Cadastrar Tag de CLP no SQLite</h3>
         <button class="modal-close" id="btn-close-add-tag">&times;</button>
       </div>
       <form id="form-add-tag" class="modal-body">
+        <input type="hidden" id="input-tag-direction" value="READ">
+
         <div class="form-group">
-          <label>Nome da Tag</label>
-          <input type="text" id="input-tag-name" class="form-control" placeholder="Ex: Pressostato_Hidraulico" required>
+          <label>Finalidade da Tag *</label>
+          <div class="tag-direction-selector">
+            <button type="button" class="btn-direction active" id="btn-dir-read" data-dir="READ">
+              📥 Tag de Leitura (Refresh Automático)
+            </button>
+            <button type="button" class="btn-direction" id="btn-dir-write" data-dir="WRITE">
+              📤 Tag de Escrita (Comando / Setpoint)
+            </button>
+          </div>
         </div>
+
+        <div class="form-group">
+          <label>Nome Identificador da Tag *</label>
+          <input type="text" id="input-tag-name" class="form-control" placeholder="Ex: Status_Pressao_Hidraulica ou Comando_Soltar_Placa" required>
+        </div>
+
         <div class="form-row">
           <div class="form-group flex-1">
             <label>Tipo de Endereço</label>
@@ -488,28 +545,39 @@
               <option value="X">X - Entrada Digital</option>
               <option value="Y">Y - Saída Digital</option>
               <option value="K">K - Keep Relay</option>
+              <option value="G">G - Sinal CNC -> PMC</option>
+              <option value="F">F - Sinal PMC -> CNC</option>
+              <option value="A">A - Alarme do CLP</option>
             </select>
           </div>
           <div class="form-group flex-1">
-            <label>Endereço</label>
-            <input type="number" id="input-tag-address" class="form-control" value="1000" required>
+            <label>Endereço Numérico</label>
+            <input type="number" id="input-tag-address" class="form-control" value="1000" min="0" required>
           </div>
           <div class="form-group flex-1">
             <label>Tipo de Dado</label>
             <select id="input-tag-datatype" class="form-control">
-              <option value="Byte">Byte</option>
-              <option value="Word">Word</option>
-              <option value="Long">Long</option>
+              <option value="Byte" selected>Byte (8 bits)</option>
+              <option value="Word">Word (16 bits)</option>
+              <option value="Long">Long (32 bits)</option>
             </select>
           </div>
         </div>
-        <div class="form-group">
-          <label>Descrição</label>
-          <input type="text" id="input-tag-desc" class="form-control" placeholder="Descrição funcional da tag">
+
+        <!-- Campo exclusivo de valor de escrita -->
+        <div class="form-group" id="group-write-value" style="display: none;">
+          <label>Valor Padrão de Escrita (para comandos)</label>
+          <input type="text" id="input-tag-write-value" class="form-control" value="1" placeholder="Ex: 1 ou 255 ou 100">
         </div>
+
+        <div class="form-group">
+          <label>Descrição Funcional</label>
+          <input type="text" id="input-tag-desc" class="form-control" placeholder="Ex: Monitoramento da pressão de linha / Acionamento do pistão">
+        </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-cancel-add-tag">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar no Banco</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-tag">💾 Salvar no SQLite</button>
         </div>
       </form>
     </div>

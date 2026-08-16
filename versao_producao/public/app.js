@@ -29,10 +29,42 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-refresh-fleet').addEventListener('click', () => loadFleet());
   document.getElementById('btn-clear-logs').addEventListener('click', () => { terminalLogs.innerHTML = ''; });
 
-  // Botão Sub-modal Tag
-  document.getElementById('btn-add-tag-modal').addEventListener('click', () => { modalAddTag.classList.add('active'); });
+  // Botões Adicionar Tag (Leitura vs Escrita)
+  document.getElementById('btn-open-add-read-tag').addEventListener('click', () => openAddTagModal('READ'));
+  document.getElementById('btn-open-add-write-tag').addEventListener('click', () => openAddTagModal('WRITE'));
   document.getElementById('btn-close-add-tag').addEventListener('click', () => { modalAddTag.classList.remove('active'); });
   document.getElementById('btn-cancel-add-tag').addEventListener('click', () => { modalAddTag.classList.remove('active'); });
+
+  // Alternância de Direção no Modal de Tag
+  const btnDirRead = document.getElementById('btn-dir-read');
+  const btnDirWrite = document.getElementById('btn-dir-write');
+  const inputTagDir = document.getElementById('input-tag-direction');
+  const groupWriteVal = document.getElementById('group-write-value');
+
+  btnDirRead.addEventListener('click', () => setTagDirection('READ'));
+  btnDirWrite.addEventListener('click', () => setTagDirection('WRITE'));
+
+  function setTagDirection(dir) {
+    inputTagDir.value = dir;
+    if (dir === 'READ') {
+      btnDirRead.classList.add('active');
+      btnDirWrite.classList.remove('active');
+      groupWriteVal.style.display = 'none';
+      document.getElementById('modal-tag-title').textContent = '📥 Cadastrar Tag de Leitura no SQLite';
+    } else {
+      btnDirWrite.classList.add('active');
+      btnDirRead.classList.remove('active');
+      groupWriteVal.style.display = 'block';
+      document.getElementById('modal-tag-title').textContent = '📤 Cadastrar Tag de Escrita no SQLite';
+    }
+  }
+
+  function openAddTagModal(direction = 'READ') {
+    setTagDirection(direction);
+    document.getElementById('form-add-tag').reset();
+    document.getElementById('input-tag-direction').value = direction;
+    modalAddTag.classList.add('active');
+  }
 
   // Abas do Painel Individual
   const panelTabs = document.querySelectorAll('.panel-tab');
@@ -107,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderFleetGrid(fleetData);
         updateFleetStats(fleetData);
 
-        // Se o modal de uma máquina estiver aberto, atualiza seus dados
         if (activeMachineId) {
           const current = fleetData.find(m => m.id === activeMachineId);
           if (current) updateActiveMachineView(current);
@@ -225,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }).join('');
 
-    // Adiciona Event Listeners nos botões dos cards
+    // Event Listeners nos botões dos cards
     document.querySelectorAll('.btn-open-panel').forEach(b => {
       b.addEventListener('click', (e) => {
         const id = Number(e.currentTarget.dataset.id);
@@ -263,17 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Atualiza cabeçalho do modal
     document.getElementById('panel-machine-title').textContent = activeMachineData.name;
     document.getElementById('panel-machine-subtitle').textContent = `IP: ${activeMachineData.host} | Driver: ${activeMachineData.driver.toUpperCase()} | Modelo: ${activeMachineData.model || 'CNC Fanuc'}`;
     
-    // Atualiza status e botões
     updateActiveMachineView(activeMachineData);
-
-    // Carrega tags salvas do SQLite
-    await loadSavedTagsForActiveMachine();
-
-    // Abre o modal
     modalMachinePanel.classList.add('active');
   }
 
@@ -289,11 +313,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const live = machine.liveStatus || { connected: false };
     const isConnected = Boolean(live.connected);
 
-    // Dot do cabeçalho
+    // Indicador e Botão Conectar
     const dot = document.getElementById('panel-machine-dot');
     dot.className = isConnected ? 'status-indicator-dot connected' : 'status-indicator-dot disconnected';
 
-    // Botão Conectar/Desconectar do painel
     const btnToggle = document.getElementById('btn-panel-toggle-connect');
     btnToggle.textContent = isConnected ? '🛑 Desconectar' : '🔌 Conectar';
     btnToggle.className = isConnected ? 'btn btn-danger btn-sm' : 'btn btn-outline btn-sm';
@@ -312,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    // Telemetria da máquina
+    // Telemetria Operacional
     document.getElementById('panel-cnc-mode').textContent = isConnected ? (live.mode || '---') : '---';
     document.getElementById('panel-cnc-run').textContent = isConnected ? (live.runStatus || '---') : 'DESCONECTADO';
     document.getElementById('panel-cnc-prog').textContent = isConnected ? (live.program ? `O${live.program}` : '---') : '---';
@@ -328,16 +351,129 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('panel-axis-z').textContent = isConnected && pos.Z !== undefined ? (typeof pos.Z === 'number' ? pos.Z.toFixed(3) : pos.Z) : '---';
     document.getElementById('panel-axis-a').textContent = isConnected && pos.A !== undefined ? (typeof pos.A === 'number' ? pos.A.toFixed(3) : pos.A) : '---';
 
+    // Renderiza Tabelas de Tags de Leitura e Escrita
+    renderPmcTagsSection(machine);
+
     // Atualiza Painel de Bits (I/O)
     renderBitMatrices(machine);
+  }
+
+  // ==================== SEÇÃO DE TAGS DE LEITURA & ESCRITA PMC ====================
+
+  function renderPmcTagsSection(machine) {
+    const isConnected = Boolean(machine.liveStatus && machine.liveStatus.connected);
+    const tags = machine.monitoredTags || [];
+
+    const readTags = tags.filter(t => (t.direction || (t.tag && t.tag.direction) || 'READ').toUpperCase() === 'READ');
+    const writeTags = tags.filter(t => (t.direction || (t.tag && t.tag.direction) || 'READ').toUpperCase() === 'WRITE');
+
+    // 1. Tabela de Tags de Leitura (READ)
+    const tbodyRead = document.getElementById('tbody-read-tags');
+    if (readTags.length === 0) {
+      tbodyRead.innerHTML = `<tr><td colspan="8" class="text-center text-muted">Nenhuma tag de leitura cadastrada no SQLite. Clique em '+ Adicionar Tag de Leitura'.</td></tr>`;
+    } else {
+      tbodyRead.innerHTML = readTags.map(item => {
+        const tag = item.tag || {};
+        const data = item.data;
+        const val = isConnected && data && data.values && data.values.length > 0 ? data.values[0] : null;
+        const num = val !== null ? (typeof val === 'number' ? val : (Number(val) || 0)) : null;
+
+        const decDisplay = num !== null ? `<strong>${num}</strong>` : '<span class="text-muted">---</span>';
+        const hexDisplay = num !== null ? `<code>0x${num.toString(16).toUpperCase().padStart(tag.data_type === 'Word' ? 4 : 2, '0')}</code>` : '<span class="text-muted">---</span>';
+        const binDisplay = num !== null ? `<code>${num.toString(2).padStart(8, '0')}</code>` : '<span class="text-muted">---</span>';
+
+        return `
+          <tr>
+            <td><strong>${escapeHtml(tag.name || 'Tag')}</strong></td>
+            <td><code class="text-accent">${tag.address_type}${tag.address}</code></td>
+            <td>${tag.data_type || 'Byte'}</td>
+            <td>${decDisplay}</td>
+            <td>${hexDisplay}</td>
+            <td>${binDisplay}</td>
+            <td>${escapeHtml(tag.description || '-')}</td>
+            <td>
+              <button class="btn btn-secondary btn-xs btn-delete-tag" data-tag-id="${tag.id}">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 2. Tabela de Tags de Escrita (WRITE)
+    const tbodyWrite = document.getElementById('tbody-write-tags');
+    if (writeTags.length === 0) {
+      tbodyWrite.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhuma tag de escrita cadastrada no SQLite. Clique em '+ Adicionar Tag de Escrita'.</td></tr>`;
+    } else {
+      tbodyWrite.innerHTML = writeTags.map(item => {
+        const tag = item.tag || {};
+        const currentWriteVal = tag.write_value !== undefined ? tag.write_value : '0';
+
+        return `
+          <tr>
+            <td><strong>${escapeHtml(tag.name || 'Comando')}</strong></td>
+            <td><code class="text-accent">${tag.address_type}${tag.address}</code></td>
+            <td>${tag.data_type || 'Byte'}</td>
+            <td>
+              <input type="text" class="form-control input-tag-val" id="write-val-input-${tag.id}" value="${escapeHtml(currentWriteVal)}" style="max-width:110px; padding:0.35rem 0.5rem; font-family:var(--font-mono);">
+            </td>
+            <td>
+              <button class="btn btn-danger btn-xs btn-execute-tag-write" data-tag-id="${tag.id}">
+                ⚡ Escrever no CLP
+              </button>
+            </td>
+            <td>${escapeHtml(tag.description || '-')}</td>
+            <td>
+              <button class="btn btn-secondary btn-xs btn-delete-tag" data-tag-id="${tag.id}">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Event Listeners de Disparo de Escrita
+    tbodyWrite.querySelectorAll('.btn-execute-tag-write').forEach(btn => {
+      btn.onclick = async () => {
+        const tagId = btn.dataset.tagId;
+        const valInput = document.getElementById(`write-val-input-${tagId}`);
+        const customValue = valInput ? valInput.value.trim() : '0';
+
+        try {
+          log(`[Escrita Tag] Enviando comando para tag ID ${tagId} (Valor: ${customValue}) na máquina ${machine.id}...`, 'log-info');
+          const res = await fetch(`/api/machines/${machine.id}/pmc/tags/${tagId}/write`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: customValue })
+          });
+          const resJson = await res.json();
+          if (resJson.success) {
+            log(`[Escrita Tag OK] Comando executado com sucesso no CLP!`, 'log-success');
+            await loadFleet();
+          } else {
+            alert(`Erro ao executar escrita: ${resJson.error}`);
+          }
+        } catch (e) {
+          log(`[Erro Escrita Tag] ${e.message}`, 'log-error');
+        }
+      };
+    });
+
+    // Event Listeners de Exclusão de Tags
+    document.querySelectorAll('.btn-delete-tag').forEach(btn => {
+      btn.onclick = async () => {
+        const tagId = btn.dataset.tagId;
+        if (confirm('Deseja excluir esta tag do banco de dados SQLite?')) {
+          await fetch(`/api/machines/${machine.id}/pmc/tags/${tagId}`, { method: 'DELETE' });
+          await loadFleet();
+          log(`[SQLite] Tag ID ${tagId} removida.`, 'log-info');
+        }
+      };
+    });
   }
 
   // ==================== PAINEL DE BITS (I/O) ====================
 
   function renderBitMatrices(machine) {
     const isConnected = Boolean(machine.liveStatus && machine.liveStatus.connected);
-
-    // Encontra tags de X0, Y0, R1000 e K0 nos monitoredTags
     const tags = machine.monitoredTags || [];
     const getByteVal = (type, addr) => {
       if (!isConnected) return null;
@@ -388,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.onclick = async () => {
           const bitIndex = Number(btn.dataset.bit);
           const currentVal = Number(btn.dataset.current);
-          const newVal = currentVal ^ (1 << bitIndex); // Inverte bit
+          const newVal = currentVal ^ (1 << bitIndex);
 
           try {
             log(`[Escrita Bit] Alterando ${type}${address}.${bitIndex} para ${(newVal >> bitIndex) & 1} na máquina ${activeMachineId}...`, 'log-info');
@@ -415,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ==================== LEITURA & ESCRITA PMC (ABA 3) ====================
+  // ==================== LEITURA & ESCRITA PMC AVULSA ====================
 
   document.getElementById('form-panel-pmc-read').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -496,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ==================== PARÂMETROS CNC (ABA 4) ====================
+  // ==================== PARÂMETROS CNC ====================
 
   document.getElementById('btn-panel-read-param').addEventListener('click', async () => {
     if (!activeMachineId) return;
@@ -561,59 +697,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ==================== TAGS SALVAS NO SQLITE (ABA 5) ====================
+  // ==================== SALVAR TAG NO SQLITE (LEITURA OU ESCRITA) ====================
 
-  async function loadSavedTagsForActiveMachine() {
-    if (!activeMachineId) return;
-    const tbody = document.getElementById('panel-saved-tags-tbody');
-
-    try {
-      const res = await fetch(`/api/machines/${activeMachineId}/pmc/tags`);
-      const json = await res.json();
-
-      if (json.success && json.data) {
-        if (json.data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhuma tag cadastrada no banco SQLite para esta máquina.</td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = json.data.map(t => `
-          <tr>
-            <td><strong>${escapeHtml(t.name)}</strong></td>
-            <td><code>${t.address_type}${t.address}</code></td>
-            <td>${t.data_type}</td>
-            <td>${t.length}</td>
-            <td>${escapeHtml(t.description || '-')}</td>
-            <td>
-              <button class="btn btn-secondary btn-xs btn-del-tag" data-tag-id="${t.id}">🗑️ Excluir</button>
-            </td>
-          </tr>
-        `).join('');
-
-        tbody.querySelectorAll('.btn-del-tag').forEach(btn => {
-          btn.onclick = async () => {
-            const tagId = btn.dataset.tagId;
-            if (confirm('Deseja excluir esta tag do banco de dados SQLite?')) {
-              await fetch(`/api/machines/${activeMachineId}/pmc/tags/${tagId}`, { method: 'DELETE' });
-              await loadSavedTagsForActiveMachine();
-              await loadFleet();
-            }
-          };
-        });
-      }
-    } catch (e) {}
-  }
-
-  // Formulário Adicionar Tag no SQLite
   document.getElementById('form-add-tag').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!activeMachineId) return;
 
+    const direction = document.getElementById('input-tag-direction').value || 'READ';
     const payload = {
       name: document.getElementById('input-tag-name').value.trim(),
+      direction,
       address_type: document.getElementById('input-tag-type').value,
       address: Number(document.getElementById('input-tag-address').value),
       data_type: document.getElementById('input-tag-datatype').value,
+      write_value: document.getElementById('input-tag-write-value').value.trim() || '0',
       description: document.getElementById('input-tag-desc').value.trim()
     };
 
@@ -627,9 +724,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (json.success) {
         modalAddTag.classList.remove('active');
         document.getElementById('form-add-tag').reset();
-        await loadSavedTagsForActiveMachine();
         await loadFleet();
-        log(`[SQLite] Nova tag '${payload.name}' salva no banco de dados com sucesso!`, 'log-success');
+        log(`[SQLite] Nova tag de ${direction === 'READ' ? 'Leitura' : 'Escrita'} '${payload.name}' salva no banco de dados!`, 'log-success');
       }
     } catch (err) {
       alert(`Erro ao salvar tag: ${err.message}`);
@@ -705,7 +801,6 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'fleet_telemetry' && msg.fleet) {
-          // Atualiza dados ao vivo das máquinas
           msg.fleet.forEach(item => {
             const found = fleetData.find(m => m.id === item.machineId);
             if (found) {

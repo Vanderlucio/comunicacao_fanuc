@@ -286,6 +286,93 @@ body {
   gap: 0.5rem;
 }
 
+/* ==================== PMC SECTION BLOCKS ==================== */
+.pmc-section-block {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.pmc-section-block-collapsible {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.collapsible-summary {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  outline: none;
+}
+
+.collapsible-summary:hover {
+  color: #fff;
+}
+
+.section-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.subhead-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.subhead-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+/* Selector de Direção da Tag */
+.tag-direction-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.btn-direction {
+  flex: 1;
+  padding: 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-direction:hover {
+  color: #fff;
+  border-color: var(--border-hover);
+}
+
+.btn-direction.active[data-dir="READ"] {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-primary);
+  color: #93c5fd;
+}
+
+.btn-direction.active[data-dir="WRITE"] {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--accent-danger);
+  color: #fca5a5;
+}
+
 /* ==================== BUTTONS ==================== */
 .btn {
   display: inline-flex;
@@ -479,8 +566,8 @@ label {
 }
 
 .modal-window-large {
-  max-width: 1050px;
-  max-height: 90vh;
+  max-width: 1100px;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
 }
@@ -542,7 +629,7 @@ label {
 
 .modal-body-scrollable {
   overflow-y: auto;
-  max-height: calc(90vh - 80px);
+  max-height: calc(92vh - 80px);
 }
 
 .modal-footer {
@@ -796,19 +883,6 @@ label {
   font-weight: 700;
   margin-bottom: 0.85rem;
   color: #fca5a5;
-}
-
-/* Saved Tags */
-.tags-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.tags-title {
-  font-size: 1rem;
-  font-weight: 700;
 }
 
 /* Logs Terminal */

@@ -44,7 +44,6 @@ class MachineManager extends EventEmitter {
         const client = this.createClientForMachine(m);
         this.clients.set(m.id, client);
       } else {
-        // Atualiza configuração da instância
         const client = this.clients.get(m.id);
         this.applyMachineConfigToClient(client, m);
       }
@@ -75,12 +74,8 @@ class MachineManager extends EventEmitter {
     client.machineId = m.id;
     client.machineName = m.name;
 
-    client.on('error', (err) => {
-      // Log seguro sem derrubar processo
-      // console.log(`[Machine ${m.id} - ${m.name}] ${err.message}`);
-    });
+    client.on('error', () => {});
 
-    // Se habilitada, tenta conectar
     if (m.enabled) {
       client.connect().catch(() => {});
     }
@@ -133,6 +128,28 @@ class MachineManager extends EventEmitter {
     return await client.writePmc(addressType, startAddress, values, dataType);
   }
 
+  async executeTagWrite(machineId, tagId, customValue = null) {
+    const machineIdNum = Number(machineId);
+    const tagIdNum = Number(tagId);
+    const tags = await this.db.getPmcTagsByMachine(machineIdNum);
+    const tag = tags.find(t => t.id === tagIdNum);
+    if (!tag) throw new Error(`Tag ID ${tagId} não encontrada para a máquina ${machineId}`);
+
+    const rawVal = customValue !== null && customValue !== undefined ? customValue : tag.write_value;
+    const values = String(rawVal).split(',').map(v => Number(v.trim())).filter(v => !isNaN(v));
+    if (values.length === 0) values.push(0);
+
+    const res = await this.writePmc(machineIdNum, tag.address_type, tag.address, values, tag.data_type || 'Byte');
+    
+    // Atualiza o valor no banco se um novo valor foi enviado
+    if (customValue !== null && customValue !== undefined) {
+      await this.db.updatePmcTag(tagIdNum, { write_value: String(customValue) });
+    }
+
+    await this.updateTelemetryForMachine(machineIdNum);
+    return { success: true, tag, writtenValues: values, result: res };
+  }
+
   async readParameter(machineId, paramNumber, axis = 0) {
     const client = this.getClient(machineId);
     if (!client) throw new Error(`Máquina ID ${machineId} não encontrada`);
@@ -176,18 +193,23 @@ class MachineManager extends EventEmitter {
       }
     }
 
-    // Lê tags de PMC associadas a esta máquina no banco de dados
+    // Carrega todas as tags cadastradas para esta máquina no SQLite
     const tags = await this.db.getPmcTagsByMachine(id);
     const monitoredTags = [];
 
-    if (status.connected && client) {
-      for (const tag of tags) {
+    for (const tag of tags) {
+      const isRead = (tag.direction || 'READ').toUpperCase() === 'READ';
+
+      if (isRead && status.connected && client) {
         try {
           const data = await client.readPmc(tag.address_type, tag.address, tag.length || 1, tag.data_type || 'Byte');
-          monitoredTags.push({ tag, data });
+          monitoredTags.push({ tag, data, direction: 'READ' });
         } catch (err) {
-          monitoredTags.push({ tag, error: err.message });
+          monitoredTags.push({ tag, error: err.message, direction: 'READ' });
         }
+      } else {
+        // Tag de escrita ou máquina offline
+        monitoredTags.push({ tag, direction: (tag.direction || 'READ').toUpperCase() });
       }
     }
 

@@ -31,13 +31,12 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // ==================== REST API: MÁQUINAS ====================
 
-// Listar todas as máquinas
+// Listar todas as máquinas com telemetria
 app.get('/api/machines', async (req, res) => {
   try {
     const machines = await db.getAllMachines();
     const fleet = await machineManager.getAllFleetTelemetry();
     
-    // Mescla dados do banco com telemetria ativa
     const result = machines.map(m => {
       const live = fleet.find(f => f.machineId === m.id);
       return {
@@ -99,14 +98,16 @@ app.post('/api/machines', async (req, res) => {
       enabled: 1
     });
 
-    // Adiciona tags básicas de CLP padrão para a nova máquina
     const mId = newMachine.id;
-    await db.addPmcTag(mId, { name: 'Status_Geral', address_type: 'R', address: 1000, length: 4, data_type: 'Byte', description: 'Relés internos R1000' });
-    await db.addPmcTag(mId, { name: 'Entradas_Painel', address_type: 'X', address: 0, length: 2, data_type: 'Byte', description: 'Entradas físicas X0' });
-    await db.addPmcTag(mId, { name: 'Saidas_Atuadores', address_type: 'Y', address: 0, length: 2, data_type: 'Byte', description: 'Saídas físicas Y0' });
-    await db.addPmcTag(mId, { name: 'Keep_Relays', address_type: 'K', address: 0, length: 4, data_type: 'Byte', description: 'Keep Relays K0' });
+    // Tags padrão de leitura
+    await db.addPmcTag(mId, { name: 'Status_Geral', direction: 'READ', address_type: 'R', address: 1000, length: 4, data_type: 'Byte', description: 'Relés internos R1000' });
+    await db.addPmcTag(mId, { name: 'Entradas_Painel', direction: 'READ', address_type: 'X', address: 0, length: 2, data_type: 'Byte', description: 'Entradas físicas X0' });
+    await db.addPmcTag(mId, { name: 'Saidas_Monitoradas', direction: 'READ', address_type: 'Y', address: 0, length: 2, data_type: 'Byte', description: 'Saídas físicas Y0' });
+    await db.addPmcTag(mId, { name: 'Keep_Relays', direction: 'READ', address_type: 'K', address: 0, length: 4, data_type: 'Byte', description: 'Keep Relays K0' });
 
-    // Atualiza instâncias ativas no MachineManager
+    // Tags padrão de escrita
+    await db.addPmcTag(mId, { name: 'Comando_Soltura_Placa', direction: 'WRITE', address_type: 'Y', address: 0, length: 1, data_type: 'Byte', write_value: '1', description: 'Ativa soltura de placa' });
+
     await machineManager.loadAndSyncClients();
 
     res.json({ success: true, message: `Máquina '${newMachine.name}' adicionada com sucesso!`, data: newMachine });
@@ -159,7 +160,7 @@ app.post('/api/machines/:id/disconnect', async (req, res) => {
 
 // ==================== OPERAÇÕES DE PMC / CLP POR MÁQUINA ====================
 
-// Ler registradores do CLP da máquina
+// Ler registradores pontuais do CLP da máquina
 app.get('/api/machines/:id/pmc/read', async (req, res) => {
   try {
     const { addressType = 'R', startAddress = 1000, count = 1, dataType = 'Byte' } = req.query;
@@ -170,7 +171,7 @@ app.get('/api/machines/:id/pmc/read', async (req, res) => {
   }
 });
 
-// Escrever em registradores do CLP da máquina
+// Escrever registradores pontuais no CLP da máquina
 app.post('/api/machines/:id/pmc/write', async (req, res) => {
   try {
     const { addressType = 'R', startAddress = 1000, values = [0], dataType = 'Byte' } = req.body;
@@ -181,21 +182,45 @@ app.post('/api/machines/:id/pmc/write', async (req, res) => {
   }
 });
 
-// Listar tags de PMC salvas no SQLite para a máquina
+// Listar tags de PMC salvas no SQLite para a máquina (com filtro opcional por direção)
 app.get('/api/machines/:id/pmc/tags', async (req, res) => {
   try {
-    const tags = await db.getPmcTagsByMachine(req.params.id);
+    const direction = req.query.direction || null;
+    const tags = await db.getPmcTagsByMachine(req.params.id, direction);
     res.json({ success: true, data: tags });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Adicionar/Persistir nova tag de PMC para a máquina
+// Adicionar/Persistir nova tag de PMC (Leitura ou Escrita) para a máquina
 app.post('/api/machines/:id/pmc/tags', async (req, res) => {
   try {
     const newTag = await db.addPmcTag(req.params.id, req.body);
+    await machineManager.updateTelemetryForMachine(req.params.id);
     res.json({ success: true, message: 'Tag de PMC salva com sucesso!', data: newTag });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Atualizar tag de PMC
+app.put('/api/machines/:id/pmc/tags/:tagId', async (req, res) => {
+  try {
+    await db.updatePmcTag(req.params.tagId, req.body);
+    await machineManager.updateTelemetryForMachine(req.params.id);
+    res.json({ success: true, message: 'Tag atualizada com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Executar escrita rápida da tag de escrita cadastrada
+app.post('/api/machines/:id/pmc/tags/:tagId/write', async (req, res) => {
+  try {
+    const customValue = req.body.value !== undefined ? req.body.value : null;
+    const result = await machineManager.executeTagWrite(req.params.id, req.params.tagId, customValue);
+    res.json({ success: true, message: 'Escrita da tag executada no CLP!', data: result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -205,6 +230,7 @@ app.post('/api/machines/:id/pmc/tags', async (req, res) => {
 app.delete('/api/machines/:id/pmc/tags/:tagId', async (req, res) => {
   try {
     await db.deletePmcTag(req.params.tagId);
+    await machineManager.updateTelemetryForMachine(req.params.id);
     res.json({ success: true, message: 'Tag excluída com sucesso!' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -268,7 +294,6 @@ app.delete('/api/machines/:id/parameters/:paramId', async (req, res) => {
 // ==================== WEBSOCKET MULTI-MÁQUINAS ====================
 
 wss.on('connection', async (ws) => {
-  // Envia estado inicial de todas as máquinas assim que conecta
   try {
     const fleet = await machineManager.getAllFleetTelemetry();
     ws.send(JSON.stringify({
