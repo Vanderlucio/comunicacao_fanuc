@@ -1,6 +1,6 @@
 /**
  * Frontend JavaScript - Console Multi-Máquinas Fanuc & CLP (PMC)
- * Gerenciamento de instâncias individuais, persistência SQLite e controle em tempo real
+ * Gerenciamento de instâncias individuais e controle em tempo real
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -82,12 +82,12 @@ document.addEventListener('DOMContentLoaded', () => {
       btnDirRead.classList.add('active');
       btnDirWrite.classList.remove('active');
       groupWriteVal.style.display = 'none';
-      document.getElementById('modal-tag-title').textContent = '📥 Cadastrar Tag de Leitura no SQLite';
+      document.getElementById('modal-tag-title').textContent = '📥 Cadastrar Tag de Leitura';
     } else {
       btnDirWrite.classList.add('active');
       btnDirRead.classList.remove('active');
       groupWriteVal.style.display = 'block';
-      document.getElementById('modal-tag-title').textContent = '📤 Cadastrar Tag de Escrita no SQLite';
+      document.getElementById('modal-tag-title').textContent = '📤 Cadastrar Tag de Escrita';
     }
   }
 
@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       if (data.success) {
-        log(`[SQLite] Máquina '${payload.name}' ${isEdit ? 'atualizada' : 'cadastrada'} com sucesso!`, 'log-success');
+        log(`[Sistema] Máquina '${payload.name}' ${isEdit ? 'atualizada' : 'cadastrada'} com sucesso!`, 'log-success');
         closeModal(modalMachineConfig);
         await loadFleet();
       } else {
@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (machines.length === 0) {
       fleetGrid.innerHTML = `
         <div class="loading-state">
-          <span>Nenhuma máquina cadastrada no banco de dados SQLite.</span>
+          <span>Nenhuma máquina cadastrada.</span>
           <button class="btn btn-primary" onclick="document.getElementById('btn-open-add-machine').click()">
             ➕ Cadastrar Primeira Máquina
           </button>
@@ -313,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showConfirmModal({
           title: '🗑️ Excluir Máquina CNC',
-          message: `Deseja realmente excluir a máquina <strong>${escapeHtml(machineName)}</strong> e todas as suas tags cadastradas do banco de dados SQLite?`,
+          message: `Deseja realmente excluir a máquina <strong>${escapeHtml(machineName)}</strong> e todas as suas configurações cadastradas?`,
           onConfirm: async () => {
             await deleteMachine(id);
           }
@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Tabela de Tags de Leitura (READ)
     const tbodyRead = document.getElementById('tbody-read-tags');
     if (readTags.length === 0) {
-      tbodyRead.innerHTML = `<tr><td colspan="8" class="text-center text-muted">Nenhuma tag de leitura cadastrada no SQLite. Clique em '+ Adicionar Tag de Leitura'.</td></tr>`;
+      tbodyRead.innerHTML = `<tr><td colspan="8" class="text-center text-muted">Nenhuma tag de leitura cadastrada. Clique em '+ Adicionar Tag de Leitura'.</td></tr>`;
     } else {
       tbodyRead.innerHTML = readTags.map(item => {
         const tag = item.tag || {};
@@ -441,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Tabela de Tags de Escrita (WRITE)
     const tbodyWrite = document.getElementById('tbody-write-tags');
     if (writeTags.length === 0) {
-      tbodyWrite.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhuma tag de escrita cadastrada no SQLite. Clique em '+ Adicionar Tag de Escrita'.</td></tr>`;
+      tbodyWrite.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhuma tag de escrita cadastrada. Clique em '+ Adicionar Tag de Escrita'.</td></tr>`;
     } else {
       tbodyWrite.innerHTML = writeTags.map(item => {
         const tag = item.tag || {};
@@ -507,13 +507,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showConfirmModal({
           title: '🗑️ Excluir Tag do CLP',
-          message: `Deseja realmente excluir a tag <strong>${escapeHtml(tagName)}</strong> ${tagAddr ? `(<code>${tagAddr}</code>)` : ''} do banco de dados SQLite?`,
+          message: `Deseja realmente excluir a tag <strong>${escapeHtml(tagName)}</strong> ${tagAddr ? `(<code>${tagAddr}</code>)` : ''}?`,
           onConfirm: async () => {
             try {
               const res = await fetch(`/api/machines/${machine.id}/pmc/tags/${tagId}`, { method: 'DELETE' });
               const json = await res.json();
               if (json.success) {
-                log(`[SQLite] Tag '${tagName}' excluída com sucesso.`, 'log-info');
+                log(`[Sistema] Tag '${tagName}' excluída com sucesso.`, 'log-info');
                 await loadFleet();
               } else {
                 alert(`Erro ao excluir tag: ${json.error}`);
@@ -754,7 +754,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ==================== SALVAR TAG NO SQLITE (LEITURA OU ESCRITA) ====================
+  // ==================== SALVAR TAG (LEITURA OU ESCRITA) ====================
 
   document.getElementById('form-add-tag').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -782,7 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modalAddTag.classList.remove('active');
         document.getElementById('form-add-tag').reset();
         await loadFleet();
-        log(`[SQLite] Nova tag de ${direction === 'READ' ? 'Leitura' : 'Escrita'} '${payload.name}' salva no banco de dados!`, 'log-success');
+        log(`[Sistema] Nova tag de ${direction === 'READ' ? 'Leitura' : 'Escrita'} '${payload.name}' salva com sucesso!`, 'log-success');
       }
     } catch (err) {
       alert(`Erro ao salvar tag: ${err.message}`);
@@ -819,7 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/machines/${id}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
-        log(`[SQLite] Máquina ID ${id} excluída do banco de dados.`, 'log-info');
+        log(`[Sistema] Máquina ID ${id} excluída com sucesso.`, 'log-info');
         await loadFleet();
       }
     } catch (e) {

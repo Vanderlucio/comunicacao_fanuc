@@ -32,8 +32,8 @@
         <span class="stat-val text-success" id="stat-connected-machines">0</span>
       </div>
       <div class="stat-pill">
-        <span class="stat-label">Banco de Dados:</span>
-        <span class="stat-val text-accent">SQLite Ativo</span>
+        <span class="stat-label">Sistema:</span>
+        <span class="stat-val text-success">Online</span>
       </div>
     </div>
 
@@ -64,7 +64,7 @@
       <div class="fleet-grid" id="fleet-grid">
         <div class="loading-state">
           <div class="spinner"></div>
-          <span>Carregando máquinas do banco de dados SQLite...</span>
+          <span>Carregando máquinas cadastradas...</span>
         </div>
       </div>
     </section>
@@ -86,7 +86,7 @@
     </section>
   </main>
 
-  <!-- ==================== MODAL 1: ADICIONAR / EDITAR MÁQUINA (SQLITE) ==================== -->
+  <!-- ==================== MODAL 1: ADICIONAR / EDITAR MÁQUINA ==================== -->
   <div class="modal-backdrop" id="modal-machine-config">
     <div class="modal-window">
       <div class="modal-header">
@@ -163,7 +163,7 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-cancel-machine">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btn-save-machine">
-            💾 Salvar no SQLite
+            💾 Salvar Configurações
           </button>
         </div>
       </form>
@@ -207,7 +207,7 @@
             <div class="section-subhead">
               <div>
                 <h4 class="subhead-title">📥 Tags de Leitura Automática (Atualizadas a Cada Refresh)</h4>
-                <p class="subhead-desc">Tags persistidas no SQLite que são lidas ciclicamente em tempo real do CLP desta máquina.</p>
+                <p class="subhead-desc">Tags cadastradas que são lidas ciclicamente em tempo real do CLP desta máquina.</p>
               </div>
               <button class="btn btn-primary btn-sm" id="btn-open-add-read-tag">
                 ➕ Adicionar Tag de Leitura
@@ -230,7 +230,7 @@
                 </thead>
                 <tbody id="tbody-read-tags">
                   <tr>
-                    <td colspan="8" class="text-center text-muted">Carregando tags de leitura do SQLite...</td>
+                    <td colspan="8" class="text-center text-muted">Carregando tags de leitura...</td>
                   </tr>
                 </tbody>
               </table>
@@ -242,7 +242,7 @@
             <div class="section-subhead">
               <div>
                 <h4 class="subhead-title">📤 Tags de Escrita Cadastradas (Comandos & Setpoints)</h4>
-                <p class="subhead-desc">Tags de controle persistidas no SQLite para envio rápido de valores e acionamentos no CLP.</p>
+                <p class="subhead-desc">Tags de controle para envio rápido de valores e acionamentos no CLP.</p>
               </div>
               <button class="btn btn-danger btn-sm" id="btn-open-add-write-tag">
                 ➕ Adicionar Tag de Escrita
@@ -264,7 +264,7 @@
                 </thead>
                 <tbody id="tbody-write-tags">
                   <tr>
-                    <td colspan="7" class="text-center text-muted">Carregando tags de escrita do SQLite...</td>
+                    <td colspan="7" class="text-center text-muted">Carregando tags de escrita...</td>
                   </tr>
                 </tbody>
               </table>
@@ -513,7 +513,7 @@
   <div class="modal-backdrop" id="modal-add-tag">
     <div class="modal-window">
       <div class="modal-header">
-        <h3 class="modal-title" id="modal-tag-title">🏷️ Cadastrar Tag de CLP no SQLite</h3>
+        <h3 class="modal-title" id="modal-tag-title">🏷️ Cadastrar Tag do CLP</h3>
         <button class="modal-close" id="btn-close-add-tag">&times;</button>
       </div>
       <form id="form-add-tag" class="modal-body">
@@ -577,7 +577,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-cancel-add-tag">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="btn-save-tag">💾 Salvar no SQLite</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-tag">💾 Salvar Tag</button>
         </div>
       </form>
     </div>
@@ -592,7 +592,7 @@
       </div>
       <div class="modal-body">
         <p id="confirm-delete-msg" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main);">
-          Tem certeza que deseja excluir este item do banco de dados SQLite?
+          Tem certeza que deseja excluir este item permanentemente?
         </p>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-cancel-confirm-delete">Cancelar</button>
