@@ -1,0 +1,49 @@
+{
+  "name": "node-red-contrib-fanuc",
+  "version": "1.0.0",
+  "description": "Nós Node-RED para comunicação industrial completa (leitura e escrita de PMC, parâmetros e status) com CNCs e CLPs Fanuc via FOCAS DLL Nativa, FOCAS TCP e OPC UA. Desenvolvido por Vanderlucio Lopes.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/test_nodes.js"
+  },
+  "keywords": [
+    "node-red",
+    "fanuc",
+    "focas",
+    "fwlib32",
+    "cnc",
+    "plc",
+    "pmc",
+    "opcua",
+    "industrial-automation",
+    "industry-4.0",
+    "iiot",
+    "scada"
+  ],
+  "author": {
+    "name": "Vanderlucio Lopes"
+  },
+  "license": "MIT",
+  "node-red": {
+    "version": ">=2.0.0",
+    "nodes": {
+      "fanuc-config": "nodes/fanuc-config.js",
+      "fanuc-pmc-read": "nodes/fanuc-pmc-read.js",
+      "fanuc-pmc-write": "nodes/fanuc-pmc-write.js",
+      "fanuc-param-read": "nodes/fanuc-param-read.js",
+      "fanuc-param-write": "nodes/fanuc-param-write.js",
+      "fanuc-status": "nodes/fanuc-status.js",
+      "fanuc-custom": "nodes/fanuc-custom.js"
+    }
+  },
+  "dependencies": {
+    "node-opcua": "^2.115.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vanderlucio/comunicacao_fanuc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vanderlucio/comunicacao_fanuc/issues"
+  }
+}

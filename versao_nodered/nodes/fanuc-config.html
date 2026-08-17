@@ -1,0 +1,133 @@
+<!--
+  Nó de Configuração Fanuc para Node-RED (fanuc-config)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-config">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-config-input-name" placeholder="Ex: Torno Fanuc 01">
+    </div>
+
+    <div class="form-row">
+        <label for="node-config-input-driver"><i class="fa fa-exchange"></i> Driver</label>
+        <select id="node-config-input-driver" style="width: 70%;">
+            <option value="focas_tcp">FOCAS TCP (Ethernet Socket Porta 8193 - Sem DLL)</option>
+            <option value="focas_dll">FOCAS DLL Nativa (Fwlib32.dll 32-bit Bridge)</option>
+            <option value="opcua">OPC UA (Servidor OPC UA / CNCnetPDM Porta 4840)</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-config-input-host"><i class="fa fa-globe"></i> Endereço IP</label>
+        <input type="text" id="node-config-input-host" placeholder="192.168.1.100 ou 127.0.0.1">
+    </div>
+
+    <div class="form-row row-focas-port">
+        <label for="node-config-input-focasPort"><i class="fa fa-plug"></i> Porta FOCAS</label>
+        <input type="number" id="node-config-input-focasPort" placeholder="8193">
+    </div>
+
+    <div class="form-row row-opcua-port" style="display:none;">
+        <label for="node-config-input-opcuaPort"><i class="fa fa-plug"></i> Porta OPC UA</label>
+        <input type="number" id="node-config-input-opcuaPort" placeholder="4840">
+    </div>
+
+    <div class="form-row row-opcua-endpoint" style="display:none;">
+        <label for="node-config-input-opcuaEndpoint"><i class="fa fa-link"></i> Endpoint OPC UA</label>
+        <input type="text" id="node-config-input-opcuaEndpoint" placeholder="opc.tcp://192.168.1.100:4840">
+    </div>
+
+    <div class="form-row row-opcua-auth" style="display:none;">
+        <label for="node-config-input-username"><i class="fa fa-user"></i> Usuário OPC</label>
+        <input type="text" id="node-config-input-username" placeholder="OpcUaClient">
+    </div>
+
+    <div class="form-row row-opcua-auth" style="display:none;">
+        <label for="node-config-input-password"><i class="fa fa-key"></i> Senha OPC</label>
+        <input type="password" id="node-config-input-password" placeholder="OpcUaClient">
+    </div>
+
+    <div class="form-row">
+        <label for="node-config-input-timeout"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
+        <input type="number" id="node-config-input-timeout" placeholder="5000">
+    </div>
+
+    <div class="form-row">
+        <label for="node-config-input-reconnectInterval"><i class="fa fa-refresh"></i> Reconexão (ms)</label>
+        <input type="number" id="node-config-input-reconnectInterval" placeholder="5000">
+    </div>
+
+    <div class="form-row">
+        <label for="node-config-input-autoConnect"><i class="fa fa-bolt"></i> Conectar Auto</label>
+        <input type="checkbox" id="node-config-input-autoConnect" style="width: auto; vertical-align: top;">
+        <span style="font-size: 12px; color: #666; margin-left: 8px;">Conectar ao inicializar o fluxo</span>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-config">
+    <p><b>Configuração de Conexão Fanuc CNC / CLP (PMC)</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Este nó gerencia a conexão compartilhada com o controlador Fanuc via:</p>
+    <ul>
+        <li><b>FOCAS TCP:</b> Comunicação direta via socket TCP Ethernet (porta padrão <code>8193</code>). Funciona nativamente em Linux, Windows e Docker sem precisar de DLLs proprietárias.</li>
+        <li><b>FOCAS DLL Nativa:</b> Execução de chamadas oficiais da Fanuc FOCAS 1/2 através da <code>Fwlib32.dll</code> via processo bridge nativo.</li>
+        <li><b>OPC UA:</b> Integração padrão com servidores industriais OPC UA e pontes CNCnetPDM na porta <code>4840</code>.</li>
+    </ul>
+    <h3>Propriedades</h3>
+    <dl class="message-properties">
+        <dt>Driver <span class="property-type">string</span></dt>
+        <dd>Protocolo utilizado para se comunicar com a máquina.</dd>
+        <dt>Endereço IP <span class="property-type">string</span></dt>
+        <dd>IP do CNC ou do servidor bridge na rede industrial.</dd>
+        <dt>Porta <span class="property-type">number</span></dt>
+        <dd>Porta FOCAS (<code>8193</code>) ou OPC UA (<code>4840</code>).</dd>
+        <dt>Timeout <span class="property-type">number</span></dt>
+        <dd>Tempo limite de espera de resposta em milissegundos.</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-config', {
+        category: 'config',
+        defaults: {
+            name: { value: "" },
+            driver: { value: "focas_tcp", required: true },
+            host: { value: "127.0.0.1", required: true },
+            focasPort: { value: 8193, validate: RED.validators.number() },
+            opcuaPort: { value: 4840, validate: RED.validators.number() },
+            opcuaEndpoint: { value: "" },
+            timeout: { value: 5000, validate: RED.validators.number() },
+            reconnectInterval: { value: 5000, validate: RED.validators.number() },
+            autoConnect: { value: true }
+        },
+        credentials: {
+            username: { type: "text" },
+            password: { type: "password" }
+        },
+        label: function() {
+            if (this.name) return this.name;
+            const drv = this.driver || 'focas_tcp';
+            return `${drv.toUpperCase()} (${this.host || '127.0.0.1'})`;
+        },
+        oneditprepare: function() {
+            function updateDriverFields() {
+                const driver = $("#node-config-input-driver").val();
+                if (driver === 'opcua') {
+                    $(".row-focas-port").hide();
+                    $(".row-opcua-port").show();
+                    $(".row-opcua-endpoint").show();
+                    $(".row-opcua-auth").show();
+                } else {
+                    $(".row-focas-port").show();
+                    $(".row-opcua-port").hide();
+                    $(".row-opcua-endpoint").hide();
+                    $(".row-opcua-auth").hide();
+                }
+            }
+
+            $("#node-config-input-driver").on('change', updateDriverFields);
+            updateDriverFields();
+        }
+    });
+</script>

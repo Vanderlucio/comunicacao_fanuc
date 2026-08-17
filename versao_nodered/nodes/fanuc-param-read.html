@@ -1,0 +1,105 @@
+<!--
+  Nó de Leitura de Parâmetros Fanuc CNC para Node-RED (fanuc-param-read)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-param-read">
+    <div class="form-row">
+        <label for="node-input-connection"><i class="fa fa-server"></i> Conexão</label>
+        <input type="text" id="node-input-connection">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-input-name" placeholder="Ex: Ler Parâmetro #5001">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-paramNumber"><i class="fa fa-sliders"></i> Nº Parâmetro</label>
+        <input type="number" id="node-input-paramNumber" placeholder="Ex: 5001, 20, 3105">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-axis"><i class="fa fa-arrows"></i> Eixo</label>
+        <select id="node-input-axis" style="width: 70%;">
+            <option value="0">0 - Geral / Todos os Eixos</option>
+            <option value="1">1 - Eixo X</option>
+            <option value="2">2 - Eixo Y</option>
+            <option value="3">3 - Eixo Z</option>
+            <option value="4">4 - Eixo 4 (A / B / C)</option>
+        </select>
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
+    <div class="form-row">
+        <label for="node-input-triggerMode"><i class="fa fa-play-circle"></i> Disparo</label>
+        <select id="node-input-triggerMode" style="width: 70%;">
+            <option value="input">Ao receber mensagem de entrada (msg)</option>
+            <option value="interval">Cíclico Automático (Polling Interval)</option>
+        </select>
+    </div>
+
+    <div class="form-row row-interval" style="display:none;">
+        <label for="node-input-interval"><i class="fa fa-clock-o"></i> Intervalo (ms)</label>
+        <input type="number" id="node-input-interval" min="100" placeholder="2000">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-param-read">
+    <p><b>Leitura de Parâmetros do CNC Fanuc</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Lê valores de parâmetros internos do CNC Fanuc (ex: <code>#0020</code> Canal de I/O, <code>#5001</code> Correção de ferramenta, <code>#1420</code> Avanço rápido, etc.).</p>
+
+    <h3>Entradas Dinâmicas (Opcional)</h3>
+    <dl class="message-properties">
+        <dt>msg.paramNumber | msg.param <span class="property-type">number</span></dt>
+        <dd>Sobrescreve o número do parâmetro a ser consultado.</dd>
+        <dt>msg.axis <span class="property-type">number</span></dt>
+        <dd>Sobrescreve o eixo consultado (<code>0</code> = geral, <code>1</code> = X, <code>2</code> = Y, etc.).</dd>
+    </dl>
+
+    <h3>Saídas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload <span class="property-type">object</span></dt>
+        <dd>Objeto contendo <code>paramNumber</code>, <code>axis</code>, <code>value</code>, <code>name</code> descritivo e <code>description</code> de engenharia.</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-param-read', {
+        category: 'Fanuc CNC',
+        color: '#00bcd4',
+        defaults: {
+            connection: { value: "", type: "fanuc-config", required: true },
+            name: { value: "" },
+            paramNumber: { value: 5001, validate: RED.validators.number() },
+            axis: { value: 0 },
+            triggerMode: { value: "input" },
+            interval: { value: 2000 }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-sliders",
+        label: function() {
+            if (this.name) return this.name;
+            const p = this.paramNumber || 5001;
+            const a = Number(this.axis) > 0 ? ` [Eixo ${this.axis}]` : '';
+            return `Ler Param #${p}${a}`;
+        },
+        paletteLabel: "fanuc param read",
+        oneditprepare: function() {
+            function updateFields() {
+                const trig = $("#node-input-triggerMode").val();
+                if (trig === 'interval') {
+                    $(".row-interval").show();
+                } else {
+                    $(".row-interval").hide();
+                }
+            }
+
+            $("#node-input-triggerMode").on('change', updateFields);
+            updateFields();
+        }
+    });
+</script>

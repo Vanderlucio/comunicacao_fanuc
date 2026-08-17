@@ -1,0 +1,67 @@
+<!--
+  Nó de Ação Dinâmica Fanuc para Node-RED (fanuc-custom)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-custom">
+    <div class="form-row">
+        <label for="node-input-connection"><i class="fa fa-server"></i> Conexão</label>
+        <input type="text" id="node-input-connection">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-input-name" placeholder="Ex: Ação Dinâmica Fanuc">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-defaultAction"><i class="fa fa-cogs"></i> Ação Padrão</label>
+        <select id="node-input-defaultAction" style="width: 70%;">
+            <option value="readPmc">readPmc - Ler Registradores PMC</option>
+            <option value="writePmc">writePmc - Escrever Registradores PMC</option>
+            <option value="readBit">readBit - Ler Bit Específico</option>
+            <option value="writeBit">writeBit - Escrever Bit Específico</option>
+            <option value="readParam">readParam - Ler Parâmetro CNC</option>
+            <option value="writeParam">writeParam - Escrever Parâmetro CNC</option>
+            <option value="readStatus">readStatus - Telemetria / Status CNC</option>
+            <option value="connect">connect - Conectar ao CNC</option>
+            <option value="disconnect">disconnect - Desconectar do CNC</option>
+        </select>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-custom">
+    <p><b>Execução Dinâmica e Customizada Fanuc</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Este nó executa qualquer comando Fanuc de forma programática através da propriedade <code>msg.action</code> ou <code>msg.topic</code>.</p>
+
+    <h3>Ações Suportadas</h3>
+    <ul>
+        <li><code>readPmc</code>: Lê dados do PMC (usa <code>msg.address</code>, <code>msg.count</code>, <code>msg.dataType</code>).</li>
+        <li><code>writePmc</code>: Escreve dados no PMC (usa <code>msg.address</code>, <code>msg.payload</code>, <code>msg.dataType</code>).</li>
+        <li><code>readBit</code>: Lê bit específico (usa <code>msg.addressType</code>, <code>msg.byteAddress</code>, <code>msg.bitIndex</code>).</li>
+        <li><code>writeBit</code>: Escreve bit específico (usa <code>msg.addressType</code>, <code>msg.byteAddress</code>, <code>msg.bitIndex</code>, <code>msg.payload</code>).</li>
+        <li><code>readParam</code>: Lê parâmetro CNC (usa <code>msg.paramNumber</code>, <code>msg.axis</code>).</li>
+        <li><code>writeParam</code>: Escreve parâmetro CNC (usa <code>msg.paramNumber</code>, <code>msg.axis</code>, <code>msg.payload</code>).</li>
+        <li><code>readStatus</code>: Lê status e coordenadas de eixos em tempo real.</li>
+    </ul>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-custom', {
+        category: 'Fanuc CNC',
+        color: '#673ab7',
+        defaults: {
+            connection: { value: "", type: "fanuc-config", required: true },
+            name: { value: "" },
+            defaultAction: { value: "readPmc" }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-terminal",
+        label: function() {
+            return this.name || `Fanuc (${this.defaultAction || 'custom'})`;
+        },
+        paletteLabel: "fanuc custom"
+    });
+</script>

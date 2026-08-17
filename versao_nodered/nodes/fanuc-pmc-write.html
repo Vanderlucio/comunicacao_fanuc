@@ -1,0 +1,154 @@
+<!--
+  Nó de Escrita Fanuc PMC para Node-RED (fanuc-pmc-write)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-pmc-write">
+    <div class="form-row">
+        <label for="node-input-connection"><i class="fa fa-server"></i> Conexão</label>
+        <input type="text" id="node-input-connection">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-input-name" placeholder="Ex: Escrever R1000 ou Acionar Y0.0">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-writeMode"><i class="fa fa-list-alt"></i> Modo Escrita</label>
+        <select id="node-input-writeMode" style="width: 70%;">
+            <option value="range">Valores / Bloco de Registradores (Byte, Word, Long, Float)</option>
+            <option value="bit">Bit Específico (0 a 7 - ex: Y0.0, R1000.2, K0.5)</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-addressType"><i class="fa fa-cube"></i> Tipo de PMC</label>
+        <select id="node-input-addressType" style="width: 70%;">
+            <option value="R">R - Relés Internos do CLP (Internal Relays)</option>
+            <option value="Y">Y - Saídas Digitais Físicas (Digital Outputs)</option>
+            <option value="D">D - Tabela de Dados Numéricos (Data Table)</option>
+            <option value="K">K - Relés de Retenção (Keep Relays)</option>
+            <option value="G">G - Sinais do CLP para o CNC (Signal to CNC)</option>
+            <option value="A">A - Demandas de Mensagem / Alarme</option>
+            <option value="T">T - Temporizadores Variáveis (Timers)</option>
+            <option value="C">C - Contadores (Counters)</option>
+            <option value="E">E - Relés Estendidos (Extended Relays)</option>
+            <option value="B">B - Memória Não-Volátil (Non-volatile)</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-startAddress"><i class="fa fa-hashtag"></i> Endereço</label>
+        <input type="number" id="node-input-startAddress" placeholder="Ex: 1000 para R1000 ou 0 para Y0">
+    </div>
+
+    <div class="form-row row-write-bit" style="display:none;">
+        <label for="node-input-bitIndex"><i class="fa fa-toggle-on"></i> Índice Bit (0-7)</label>
+        <input type="number" id="node-input-bitIndex" min="0" max="7" placeholder="0 a 7">
+    </div>
+
+    <div class="form-row row-write-range">
+        <label for="node-input-dataType"><i class="fa fa-code"></i> Tipo de Dado</label>
+        <select id="node-input-dataType" style="width: 70%;">
+            <option value="Byte">Byte (8 bits: 0 a 255)</option>
+            <option value="Word">Word (16 bits: -32768 a 32767)</option>
+            <option value="Long">Long (32 bits com sinal)</option>
+            <option value="Float">Float (Ponto Flutuante IEEE 754)</option>
+        </select>
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
+    <div class="form-row">
+        <label for="node-input-valueSource"><i class="fa fa-pencil-square-o"></i> Origem Valor</label>
+        <select id="node-input-valueSource" style="width: 70%;">
+            <option value="msg">Mensagem de Entrada (msg.payload / msg.value)</option>
+            <option value="config">Valor Fixo Configurado</option>
+        </select>
+    </div>
+
+    <div class="form-row row-static-value" style="display:none;">
+        <label for="node-input-staticValue"><i class="fa fa-check"></i> Valor Fixo</label>
+        <input type="text" id="node-input-staticValue" placeholder="1 para Bit ou 100, 200 para Array">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-pmc-write">
+    <p><b>Escrita na Memória do CLP (PMC) Fanuc</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Escreve dados em registradores da memória do CLP Fanuc (PMC) como <b>R</b> (Relés internos), <b>Y</b> (Saídas físicas), <b>D</b> (Tabela de dados), <b>K</b> (Keep Relays), etc.</p>
+
+    <h3>Entradas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload <span class="property-type">number | boolean | array</span></dt>
+        <dd>Valor a ser gravado (ex: <code>1</code> ou <code>0</code> para bit, <code>255</code> para Byte, ou <code>[10, 20, 30]</code> para múltiplos).</dd>
+        <dt>msg.address <span class="property-type">string</span></dt>
+        <dd>(Opcional) Notação direta do endereço como <code>"Y0.2"</code> ou <code>"R1000"</code>.</dd>
+        <dt>msg.addressType <span class="property-type">string</span></dt>
+        <dd>(Opcional) Sobrescreve tipo de endereço.</dd>
+        <dt>msg.startAddress <span class="property-type">number</span></dt>
+        <dd>(Opcional) Sobrescreve o endereço inicial.</dd>
+    </dl>
+
+    <h3>Saídas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload <span class="property-type">object</span></dt>
+        <dd>Confirmação da operação de escrita contendo <code>success: true</code>, <code>writtenCount</code> e detalhes.</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-pmc-write', {
+        category: 'Fanuc CNC',
+        color: '#ff9800',
+        defaults: {
+            connection: { value: "", type: "fanuc-config", required: true },
+            name: { value: "" },
+            writeMode: { value: "range" },
+            addressType: { value: "R" },
+            startAddress: { value: 1000, validate: RED.validators.number() },
+            dataType: { value: "Byte" },
+            bitIndex: { value: 0 },
+            valueSource: { value: "msg" },
+            staticValue: { value: "1" }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "bridge.svg",
+        align: "right",
+        label: function() {
+            if (this.name) return this.name;
+            const type = this.addressType || 'R';
+            const addr = this.startAddress !== undefined ? this.startAddress : 1000;
+            if (this.writeMode === 'bit') {
+                return `Escrever PMC ${type}${addr}.${this.bitIndex || 0}`;
+            }
+            return `Escrever PMC ${type}${addr}`;
+        },
+        paletteLabel: "fanuc pmc write",
+        oneditprepare: function() {
+            function updateFields() {
+                const mode = $("#node-input-writeMode").val();
+                if (mode === 'bit') {
+                    $(".row-write-range").hide();
+                    $(".row-write-bit").show();
+                } else {
+                    $(".row-write-range").show();
+                    $(".row-write-bit").hide();
+                }
+
+                const src = $("#node-input-valueSource").val();
+                if (src === 'config') {
+                    $(".row-static-value").show();
+                } else {
+                    $(".row-static-value").hide();
+                }
+            }
+
+            $("#node-input-writeMode").on('change', updateFields);
+            $("#node-input-valueSource").on('change', updateFields);
+            updateFields();
+        }
+    });
+</script>

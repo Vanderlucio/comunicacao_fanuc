@@ -1,0 +1,178 @@
+<!--
+  Nó de Leitura Fanuc PMC para Node-RED (fanuc-pmc-read)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-pmc-read">
+    <div class="form-row">
+        <label for="node-input-connection"><i class="fa fa-server"></i> Conexão</label>
+        <input type="text" id="node-input-connection">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-input-name" placeholder="Ex: Ler R1000 ou Ler X0.0">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-readMode"><i class="fa fa-list-alt"></i> Modo Leitura</label>
+        <select id="node-input-readMode" style="width: 70%;">
+            <option value="range">Bloco / Faixa de Registradores (Byte, Word, Long, Float)</option>
+            <option value="bit">Bit Específico (0 a 7 - ex: R1000.2, X0.0, Y0.5)</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-addressType"><i class="fa fa-cube"></i> Tipo de PMC</label>
+        <select id="node-input-addressType" style="width: 70%;">
+            <option value="R">R - Relés Internos do CLP (Internal Relays)</option>
+            <option value="D">D - Tabela de Dados Numéricos (Data Table)</option>
+            <option value="X">X - Entradas Digitais Físicas (Digital Inputs)</option>
+            <option value="Y">Y - Saídas Digitais Físicas (Digital Outputs)</option>
+            <option value="K">K - Relés de Retenção (Keep Relays)</option>
+            <option value="G">G - Sinais do CLP para o CNC (Signal to CNC)</option>
+            <option value="F">F - Sinais do CNC para o CLP (Signal from CNC)</option>
+            <option value="A">A - Demandas de Mensagem / Alarme</option>
+            <option value="T">T - Temporizadores Variáveis (Timers)</option>
+            <option value="C">C - Contadores (Counters)</option>
+            <option value="E">E - Relés Estendidos (Extended Relays)</option>
+            <option value="B">B - Memória Não-Volátil (Non-volatile)</option>
+        </select>
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-startAddress"><i class="fa fa-hashtag"></i> Endereço</label>
+        <input type="number" id="node-input-startAddress" placeholder="Ex: 1000 para R1000 ou 0 para X0">
+    </div>
+
+    <div class="form-row row-read-bit" style="display:none;">
+        <label for="node-input-bitIndex"><i class="fa fa-toggle-on"></i> Índice Bit (0-7)</label>
+        <input type="number" id="node-input-bitIndex" min="0" max="7" placeholder="0 a 7">
+    </div>
+
+    <div class="form-row row-read-range">
+        <label for="node-input-count"><i class="fa fa-arrows-h"></i> Quantidade</label>
+        <input type="number" id="node-input-count" min="1" placeholder="1">
+    </div>
+
+    <div class="form-row row-read-range">
+        <label for="node-input-dataType"><i class="fa fa-code"></i> Tipo de Dado</label>
+        <select id="node-input-dataType" style="width: 70%;">
+            <option value="Byte">Byte (8 bits: 0 a 255)</option>
+            <option value="Word">Word (16 bits: -32768 a 32767)</option>
+            <option value="Long">Long (32 bits com sinal)</option>
+            <option value="Float">Float (Ponto Flutuante IEEE 754)</option>
+        </select>
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
+    <div class="form-row">
+        <label for="node-input-triggerMode"><i class="fa fa-play-circle"></i> Disparo</label>
+        <select id="node-input-triggerMode" style="width: 70%;">
+            <option value="input">Ao receber mensagem de entrada (msg)</option>
+            <option value="interval">Cíclico Automático (Polling Interval)</option>
+        </select>
+    </div>
+
+    <div class="form-row row-interval" style="display:none;">
+        <label for="node-input-interval"><i class="fa fa-clock-o"></i> Intervalo (ms)</label>
+        <input type="number" id="node-input-interval" min="100" placeholder="1000">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-outputFormat"><i class="fa fa-sign-out"></i> Saída (payload)</label>
+        <select id="node-input-outputFormat" style="width: 70%;">
+            <option value="full">Objeto Completo (valores, bits decodificados, timestamp)</option>
+            <option value="valueOnly">Apenas Valor / Array de Valores</option>
+        </select>
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-pmc-read">
+    <p><b>Leitura de Memória do CLP (PMC) Fanuc</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Lê registradores da memória do CLP Fanuc (PMC) como <b>R</b> (Relés internos), <b>D</b> (Tabela de dados), <b>X</b> (Entradas físicas), <b>Y</b> (Saídas físicas), <b>K</b> (Keep Relays), <b>G</b>, <b>F</b>, etc.</p>
+    
+    <h3>Entradas Dinâmicas (Opcional)</h3>
+    <dl class="message-properties">
+        <dt>msg.address <span class="property-type">string</span></dt>
+        <dd>Notação de endereço direta como <code>"R1000"</code>, <code>"X0.2"</code>, <code>"Y5.7"</code>, <code>"D500"</code>.</dd>
+        <dt>msg.addressType <span class="property-type">string</span></dt>
+        <dd>Sobrescreve o tipo de endereço (ex: <code>"R"</code>, <code>"D"</code>, <code>"X"</code>, <code>"Y"</code>, <code>"K"</code>).</dd>
+        <dt>msg.startAddress <span class="property-type">number</span></dt>
+        <dd>Sobrescreve o endereço inicial.</dd>
+        <dt>msg.count <span class="property-type">number</span></dt>
+        <dd>Sobrescreve a quantidade de elementos a ler.</dd>
+        <dt>msg.dataType <span class="property-type">string</span></dt>
+        <dd><code>"Byte"</code>, <code>"Word"</code>, <code>"Long"</code> ou <code>"Float"</code>.</dd>
+        <dt>msg.bitIndex <span class="property-type">number</span></dt>
+        <dd>Índice do bit (0 a 7) para leitura no modo bit.</dd>
+    </dl>
+
+    <h3>Saídas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload <span class="property-type">object | number | array</span></dt>
+        <dd>Valor lido ou objeto com o array <code>values</code> e mapa de <code>bits</code>.</dd>
+        <dt>msg.fanuc <span class="property-type">object</span></dt>
+        <dd>Metadados da leitura contendo driver, endereço, quantidade, tipo de dado e timestamp.</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-pmc-read', {
+        category: 'Fanuc CNC',
+        color: '#ff9800',
+        defaults: {
+            connection: { value: "", type: "fanuc-config", required: true },
+            name: { value: "" },
+            readMode: { value: "range" },
+            addressType: { value: "R" },
+            startAddress: { value: 1000, validate: RED.validators.number() },
+            count: { value: 1, validate: RED.validators.number() },
+            dataType: { value: "Byte" },
+            bitIndex: { value: 0 },
+            formattedAddress: { value: "" },
+            triggerMode: { value: "input" },
+            interval: { value: 1000 },
+            outputFormat: { value: "full" }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "bridge.svg",
+        label: function() {
+            if (this.name) return this.name;
+            const type = this.addressType || 'R';
+            const addr = this.startAddress !== undefined ? this.startAddress : 1000;
+            if (this.readMode === 'bit') {
+                return `Ler PMC ${type}${addr}.${this.bitIndex || 0}`;
+            }
+            const cnt = this.count || 1;
+            return `Ler PMC ${type}${addr}[${cnt}]`;
+        },
+        paletteLabel: "fanuc pmc read",
+        oneditprepare: function() {
+            function updateFields() {
+                const mode = $("#node-input-readMode").val();
+                if (mode === 'bit') {
+                    $(".row-read-range").hide();
+                    $(".row-read-bit").show();
+                } else {
+                    $(".row-read-range").show();
+                    $(".row-read-bit").hide();
+                }
+
+                const trig = $("#node-input-triggerMode").val();
+                if (trig === 'interval') {
+                    $(".row-interval").show();
+                } else {
+                    $(".row-interval").hide();
+                }
+            }
+
+            $("#node-input-readMode").on('change', updateFields);
+            $("#node-input-triggerMode").on('change', updateFields);
+            updateFields();
+        }
+    });
+</script>

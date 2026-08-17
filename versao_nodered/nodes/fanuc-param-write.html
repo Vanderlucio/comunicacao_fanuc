@@ -1,0 +1,108 @@
+<!--
+  Nó de Escrita de Parâmetros Fanuc CNC para Node-RED (fanuc-param-write)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-param-write">
+    <div class="form-row">
+        <label for="node-input-connection"><i class="fa fa-server"></i> Conexão</label>
+        <input type="text" id="node-input-connection">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-input-name" placeholder="Ex: Alterar Parâmetro #5001">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-paramNumber"><i class="fa fa-sliders"></i> Nº Parâmetro</label>
+        <input type="number" id="node-input-paramNumber" placeholder="Ex: 5001, 20">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-axis"><i class="fa fa-arrows"></i> Eixo</label>
+        <select id="node-input-axis" style="width: 70%;">
+            <option value="0">0 - Geral / Todos os Eixos</option>
+            <option value="1">1 - Eixo X</option>
+            <option value="2">2 - Eixo Y</option>
+            <option value="3">3 - Eixo Z</option>
+            <option value="4">4 - Eixo 4 (A / B / C)</option>
+        </select>
+    </div>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+
+    <div class="form-row">
+        <label for="node-input-valueSource"><i class="fa fa-pencil-square-o"></i> Origem Valor</label>
+        <select id="node-input-valueSource" style="width: 70%;">
+            <option value="msg">Mensagem de Entrada (msg.payload / msg.value)</option>
+            <option value="config">Valor Fixo Configurado</option>
+        </select>
+    </div>
+
+    <div class="form-row row-static-value" style="display:none;">
+        <label for="node-input-staticValue"><i class="fa fa-check"></i> Valor Fixo</label>
+        <input type="number" id="node-input-staticValue" placeholder="0">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-param-write">
+    <p><b>Escrita de Parâmetros do CNC Fanuc</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Altera o valor de parâmetros internos no controlador Fanuc CNC (ex: <code>#0020</code> Canal de I/O, <code>#5001</code> Correção de ferramenta, etc.).</p>
+
+    <h3>Entradas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload | msg.value <span class="property-type">number</span></dt>
+        <dd>Valor numérico a ser gravado no parâmetro CNC.</dd>
+        <dt>msg.paramNumber | msg.param <span class="property-type">number</span></dt>
+        <dd>(Opcional) Sobrescreve o número do parâmetro.</dd>
+        <dt>msg.axis <span class="property-type">number</span></dt>
+        <dd>(Opcional) Sobrescreve o eixo alvo.</dd>
+    </dl>
+
+    <h3>Saídas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload <span class="property-type">object</span></dt>
+        <dd>Confirmação da alteração contendo <code>success: true</code>, número do parâmetro e valor aplicado.</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-param-write', {
+        category: 'Fanuc CNC',
+        color: '#00bcd4',
+        defaults: {
+            connection: { value: "", type: "fanuc-config", required: true },
+            name: { value: "" },
+            paramNumber: { value: 5001, validate: RED.validators.number() },
+            axis: { value: 0 },
+            valueSource: { value: "msg" },
+            staticValue: { value: 0 }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-sliders",
+        align: "right",
+        label: function() {
+            if (this.name) return this.name;
+            const p = this.paramNumber || 5001;
+            const a = Number(this.axis) > 0 ? ` [Eixo ${this.axis}]` : '';
+            return `Escrever Param #${p}${a}`;
+        },
+        paletteLabel: "fanuc param write",
+        oneditprepare: function() {
+            function updateFields() {
+                const src = $("#node-input-valueSource").val();
+                if (src === 'config') {
+                    $(".row-static-value").show();
+                } else {
+                    $(".row-static-value").hide();
+                }
+            }
+
+            $("#node-input-valueSource").on('change', updateFields);
+            updateFields();
+        }
+    });
+</script>

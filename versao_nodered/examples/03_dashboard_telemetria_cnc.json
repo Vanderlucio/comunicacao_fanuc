@@ -1,0 +1,54 @@
+[
+    {
+        "id": "fanuc_cfg_01",
+        "type": "fanuc-config",
+        "name": "Centro de Usinagem 01",
+        "driver": "focas_tcp",
+        "host": "127.0.0.1",
+        "focasPort": 8193,
+        "timeout": 5000,
+        "autoConnect": true
+    },
+    {
+        "id": "node_status_cyclic",
+        "type": "fanuc-status",
+        "z": "tab_telemetry_demo",
+        "connection": "fanuc_cfg_01",
+        "name": "Telemetria Contínua (1s)",
+        "triggerMode": "interval",
+        "interval": 1000,
+        "x": 220,
+        "y": 120,
+        "wires": [["function_format_dashboard", "debug_telemetry_out"]]
+    },
+    {
+        "id": "function_format_dashboard",
+        "type": "function",
+        "z": "tab_telemetry_demo",
+        "name": "Formatar Dados Dashboard",
+        "func": "const data = msg.payload;\nreturn [\n    { payload: data.positions ? data.positions.X : 0, topic: 'Eixo_X' },\n    { payload: data.positions ? data.positions.Y : 0, topic: 'Eixo_Y' },\n    { payload: data.positions ? data.positions.Z : 0, topic: 'Eixo_Z' },\n    { payload: data.feedrate || 0, topic: 'Feedrate' },\n    { payload: data.spindleSpeed || 0, topic: 'Spindle_RPM' },\n    { payload: data.mode || '---', topic: 'Modo' }\n];",
+        "outputs": 6,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 510,
+        "y": 120,
+        "wires": [[], [], [], [], [], []]
+    },
+    {
+        "id": "debug_telemetry_out",
+        "type": "debug",
+        "z": "tab_telemetry_demo",
+        "name": "Log Telemetria Fanuc",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 500,
+        "y": 200,
+        "wires": []
+    }
+]

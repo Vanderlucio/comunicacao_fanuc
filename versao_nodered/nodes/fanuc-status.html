@@ -1,0 +1,81 @@
+<!--
+  Nó de Leitura de Status Fanuc CNC para Node-RED (fanuc-status)
+  Desenvolvido por Vanderlucio Lopes
+-->
+
+<script type="text/html" data-template-name="fanuc-status">
+    <div class="form-row">
+        <label for="node-input-connection"><i class="fa fa-server"></i> Conexão</label>
+        <input type="text" id="node-input-connection">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nome</label>
+        <input type="text" id="node-input-name" placeholder="Ex: Telemetria Fanuc CNC">
+    </div>
+
+    <div class="form-row">
+        <label for="node-input-triggerMode"><i class="fa fa-play-circle"></i> Disparo</label>
+        <select id="node-input-triggerMode" style="width: 70%;">
+            <option value="interval">Cíclico Automático (Polling Interval)</option>
+            <option value="input">Ao receber mensagem de entrada (msg)</option>
+        </select>
+    </div>
+
+    <div class="form-row row-interval">
+        <label for="node-input-interval"><i class="fa fa-clock-o"></i> Intervalo (ms)</label>
+        <input type="number" id="node-input-interval" min="100" placeholder="1000">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="fanuc-status">
+    <p><b>Telemetria e Status em Tempo Real do CNC Fanuc</b></p>
+    <p><i>Desenvolvido por Vanderlucio Lopes</i></p>
+    <p>Coleta dados operacionais em tempo real da máquina Fanuc:</p>
+    <ul>
+        <li><b>Modo de Operação:</b> MDI, MEM (Automático), EDIT, JOG, HND, REF.</li>
+        <li><b>Status de Execução:</b> START (Executando), STOP (Parado), HOLD (Pausa).</li>
+        <li><b>Coordenadas dos Eixos:</b> Posições em tempo real de X, Y, Z, A, etc.</li>
+        <li><b>Velocidade e Rotação:</b> Avanço atual (Feedrate mm/min) e Spindle RPM.</li>
+        <li><b>Alarmes & Emergência:</b> Sinalização de falhas ativas ou parada de emergência.</li>
+    </ul>
+
+    <h3>Saídas</h3>
+    <dl class="message-properties">
+        <dt>msg.payload <span class="property-type">object</span></dt>
+        <dd>Objeto estruturado de telemetria da máquina.</dd>
+    </dl>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('fanuc-status', {
+        category: 'Fanuc CNC',
+        color: '#4caf50',
+        defaults: {
+            connection: { value: "", type: "fanuc-config", required: true },
+            name: { value: "" },
+            triggerMode: { value: "interval" },
+            interval: { value: 1000, validate: RED.validators.number() }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-dashboard",
+        label: function() {
+            return this.name || "Fanuc CNC Status";
+        },
+        paletteLabel: "fanuc status",
+        oneditprepare: function() {
+            function updateFields() {
+                const trig = $("#node-input-triggerMode").val();
+                if (trig === 'interval') {
+                    $(".row-interval").show();
+                } else {
+                    $(".row-interval").hide();
+                }
+            }
+
+            $("#node-input-triggerMode").on('change', updateFields);
+            updateFields();
+        }
+    });
+</script>

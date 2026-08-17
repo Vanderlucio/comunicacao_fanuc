@@ -1,0 +1,91 @@
+[
+    {
+        "id": "fanuc_cfg_01",
+        "type": "fanuc-config",
+        "name": "Torno Fanuc 01",
+        "driver": "focas_tcp",
+        "host": "127.0.0.1",
+        "focasPort": 8193,
+        "opcuaPort": 4840,
+        "timeout": 5000,
+        "autoConnect": true
+    },
+    {
+        "id": "inject_read_param",
+        "type": "inject",
+        "z": "tab_param_demo",
+        "name": "Consultar Parâmetro #5001",
+        "props": [
+            { "p": "payload" }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.5,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 180,
+        "y": 100,
+        "wires": [["node_read_p5001"]]
+    },
+    {
+        "id": "node_read_p5001",
+        "type": "fanuc-param-read",
+        "z": "tab_param_demo",
+        "connection": "fanuc_cfg_01",
+        "name": "Ler #5001 (Offset)",
+        "paramNumber": 5001,
+        "axis": 0,
+        "triggerMode": "input",
+        "x": 430,
+        "y": 100,
+        "wires": [["debug_param_out"]]
+    },
+    {
+        "id": "inject_write_param",
+        "type": "inject",
+        "z": "tab_param_demo",
+        "name": "Setar #5001 = 12500",
+        "props": [
+            { "p": "payload" }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "topic": "",
+        "payload": "12500",
+        "payloadType": "num",
+        "x": 170,
+        "y": 180,
+        "wires": [["node_write_p5001"]]
+    },
+    {
+        "id": "node_write_p5001",
+        "type": "fanuc-param-write",
+        "z": "tab_param_demo",
+        "connection": "fanuc_cfg_01",
+        "name": "Escrever #5001",
+        "paramNumber": 5001,
+        "axis": 0,
+        "valueSource": "msg",
+        "x": 430,
+        "y": 180,
+        "wires": [["debug_param_out"]]
+    },
+    {
+        "id": "debug_param_out",
+        "type": "debug",
+        "z": "tab_param_demo",
+        "name": "Debug Parâmetro CNC",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 690,
+        "y": 140,
+        "wires": []
+    }
+]
