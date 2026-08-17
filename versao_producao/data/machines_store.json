@@ -1,0 +1,151 @@
+{
+  "machines": [
+    {
+      "id": 1,
+      "name": "CNC Fanuc 01 (Principal)",
+      "model": "Fanuc Series 0i-TF",
+      "driver": "opcua",
+      "host": "127.0.0.1",
+      "focas_port": 8193,
+      "opcua_port": 4840,
+      "opcua_endpoint": "opc.tcp://127.0.0.1:4840",
+      "username": "OpcUaClient",
+      "password": "OpcUaClient",
+      "timeout": 5000,
+      "enabled": 1,
+      "created_at": "2026-08-17T19:40:28.991Z",
+      "updated_at": "2026-08-17T19:40:28.991Z"
+    }
+  ],
+  "machine_pmc_tags": [
+    {
+      "id": 1,
+      "machine_id": 1,
+      "name": "Status_Geral",
+      "direction": "READ",
+      "address_type": "R",
+      "address": 1000,
+      "length": 4,
+      "data_type": "Byte",
+      "write_value": "0",
+      "description": "Relés internos de status",
+      "created_at": "2026-08-17T19:40:28.994Z"
+    },
+    {
+      "id": 2,
+      "machine_id": 1,
+      "name": "Entradas_Painel",
+      "direction": "READ",
+      "address_type": "X",
+      "address": 0,
+      "length": 2,
+      "data_type": "Byte",
+      "write_value": "0",
+      "description": "Entradas físicas digitais",
+      "created_at": "2026-08-17T19:40:28.994Z"
+    },
+    {
+      "id": 3,
+      "machine_id": 1,
+      "name": "Saidas_Monitoradas",
+      "direction": "READ",
+      "address_type": "Y",
+      "address": 0,
+      "length": 2,
+      "data_type": "Byte",
+      "write_value": "0",
+      "description": "Monitoramento de saídas",
+      "created_at": "2026-08-17T19:40:28.995Z"
+    },
+    {
+      "id": 4,
+      "machine_id": 1,
+      "name": "Keep_Relays",
+      "direction": "READ",
+      "address_type": "K",
+      "address": 0,
+      "length": 4,
+      "data_type": "Byte",
+      "write_value": "0",
+      "description": "Parâmetros retentivos",
+      "created_at": "2026-08-17T19:40:28.996Z"
+    },
+    {
+      "id": 5,
+      "machine_id": 1,
+      "name": "Tabela_D500",
+      "direction": "READ",
+      "address_type": "D",
+      "address": 500,
+      "length": 2,
+      "data_type": "Word",
+      "write_value": "0",
+      "description": "Registradores numéricos D500",
+      "created_at": "2026-08-17T19:40:28.997Z"
+    },
+    {
+      "id": 6,
+      "machine_id": 1,
+      "name": "Comando_Soltar_Placa",
+      "direction": "WRITE",
+      "address_type": "Y",
+      "address": 0,
+      "length": 1,
+      "data_type": "Byte",
+      "write_value": "1",
+      "description": "Ativa soltura de placa",
+      "created_at": "2026-08-17T19:40:28.999Z"
+    },
+    {
+      "id": 7,
+      "machine_id": 1,
+      "name": "Rele_Liberacao_Ciclo",
+      "direction": "WRITE",
+      "address_type": "R",
+      "address": 1002,
+      "length": 1,
+      "data_type": "Byte",
+      "write_value": "255",
+      "description": "Pulso de liberação de ciclo",
+      "created_at": "2026-08-17T19:40:29.001Z"
+    }
+  ],
+  "machine_parameters": [
+    {
+      "id": 1,
+      "machine_id": 1,
+      "param_number": 4000,
+      "axis": 0,
+      "name": "Param_Sistema",
+      "description": "Configuração geral CNC",
+      "created_at": "2026-08-17T19:40:29.002Z"
+    },
+    {
+      "id": 2,
+      "machine_id": 1,
+      "param_number": 5001,
+      "axis": 1,
+      "name": "Posicao_G54_X",
+      "description": "Origem G54 Eixo X",
+      "created_at": "2026-08-17T19:40:29.002Z"
+    },
+    {
+      "id": 3,
+      "machine_id": 1,
+      "param_number": 5001,
+      "axis": 2,
+      "name": "Posicao_G54_Y",
+      "description": "Origem G54 Eixo Y",
+      "created_at": "2026-08-17T19:40:29.003Z"
+    },
+    {
+      "id": 4,
+      "machine_id": 1,
+      "param_number": 5001,
+      "axis": 3,
+      "name": "Posicao_G54_Z",
+      "description": "Origem G54 Eixo Z",
+      "created_at": "2026-08-17T19:40:29.004Z"
+    }
+  ]
+}
