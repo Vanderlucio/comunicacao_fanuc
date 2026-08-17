@@ -3,603 +3,412 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fanuc Multi-CNC & CLP (PMC) - Console Industrial</title>
+  <title>Fanuc FOCAS & CLP (PMC) - Console de Controle Industrial</title>
+  <meta name="description" content="Interface moderna para leitura e escrita em parâmetros e registradores de CLP Fanuc via FOCAS, OPC UA e TCP.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Header Principal -->
-  <header class="app-header">
-    <div class="header-left">
-      <div class="logo-box">
-        <span class="logo-icon">⚙️</span>
+  <div class="app-container">
+    <!-- Header Principal -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </div>
         <div>
-          <h1 class="logo-title">FANUC FOCAS & CLP</h1>
-          <span class="logo-subtitle">Console Multi-Máquinas & Indústria 4.0</span>
+          <h1 class="header-title">FANUC FOCAS / CLP (PMC)</h1>
+          <p class="header-subtitle">Monitoramento e Controle em Tempo Real (fwlib32)</p>
         </div>
       </div>
-    </div>
 
-    <div class="header-stats">
-      <div class="stat-pill">
-        <span class="stat-label">Total Máquinas:</span>
-        <span class="stat-val" id="stat-total-machines">0</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">Conectadas:</span>
-        <span class="stat-val text-success" id="stat-connected-machines">0</span>
-      </div>
-      <div class="stat-pill">
-        <span class="stat-label">Sistema:</span>
-        <span class="stat-val text-success">Online</span>
-      </div>
-    </div>
-
-    <div class="header-actions">
-      <button class="btn btn-primary" id="btn-open-add-machine">
-        <span class="btn-icon">➕</span>
-        Adicionar Máquina
-      </button>
-    </div>
-  </header>
-
-  <!-- Container Principal -->
-  <main class="main-container">
-
-    <!-- Seção: Frota de Máquinas CNC -->
-    <section class="fleet-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Parque de Máquinas CNC (Instâncias Independentes)</h2>
-          <p class="section-desc">Monitore, configure e abra o painel de leitura/escrita individual para cada máquina cadastrada.</p>
+      <!-- Barra de Conexão Rápida -->
+      <div class="connection-bar">
+        <div class="status-pill" id="connection-status-pill">
+          <span class="status-indicator" id="status-indicator"></span>
+          <span id="status-text">Conectando...</span>
         </div>
-        <button class="btn btn-secondary btn-sm" id="btn-refresh-fleet">
-          🔄 Atualizar Frota
+
+        <div class="driver-badge" id="current-driver-badge">
+          DRIVER: OPC UA (4840)
+        </div>
+
+        <button class="btn btn-secondary btn-sm" id="btn-config-modal">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Conexão
         </button>
       </div>
+    </header>
 
-      <!-- Grid de Cards de Máquinas -->
-      <div class="fleet-grid" id="fleet-grid">
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <span>Carregando máquinas cadastradas...</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Seção de Logs Industriais Globais -->
-    <section class="card logs-card">
-      <div class="card-header">
-        <div class="card-title">
-          <span class="card-icon">📜</span>
-          Registro de Eventos & Comunicação
-        </div>
-        <button class="btn btn-secondary btn-xs" id="btn-clear-logs">Limpar Logs</button>
-      </div>
-      <div class="card-body">
-        <div class="terminal-box" id="terminal-logs">
-          <div class="log-entry log-info">[Sistema] Console de Controle Multi-Máquinas Fanuc inicializado.</div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- ==================== MODAL 1: ADICIONAR / EDITAR MÁQUINA ==================== -->
-  <div class="modal-backdrop" id="modal-machine-config">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3 class="modal-title" id="modal-machine-title">➕ Cadastrar Nova Máquina CNC</h3>
-        <button class="modal-close" id="btn-close-machine-modal">&times;</button>
-      </div>
-      <form id="form-machine-config" class="modal-body">
-        <input type="hidden" id="input-machine-id" value="">
-
-        <div class="form-row">
-          <div class="form-group flex-2">
-            <label for="input-machine-name">Nome da Máquina *</label>
-            <input type="text" id="input-machine-name" class="form-control" placeholder="Ex: Torno CNC 01 - Produção" required>
+    <!-- Grid Principal -->
+    <main class="dashboard-grid">
+      <!-- Card 1: Telemetria e Leitura do CNC -->
+      <section class="card cnc-telemetry-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon">⚡</span>
+            Leitura & Telemetria do CNC (Eixos, Peças e Programa)
           </div>
-          <div class="form-group flex-1">
-            <label for="input-machine-model">Modelo do CNC</label>
-            <input type="text" id="input-machine-model" class="form-control" placeholder="Ex: Fanuc Series 0i-TF">
-          </div>
+          <span class="badge badge-accent" id="cnc-mode-badge">MODO: ---</span>
         </div>
-
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label for="select-machine-driver">Driver / Protocolo de Comunicação</label>
-            <select id="select-machine-driver" class="form-control">
-              <option value="focas_dll" selected>FOCAS DLL Nativa (Fwlib32.dll Oficial)</option>
-              <option value="focas_tcp">FOCAS TCP Direto (Socket 8193)</option>
-              <option value="opcua">OPC UA / CNCnetPDM (Porta 4840)</option>
-            </select>
-          </div>
-          <div class="form-group flex-1">
-            <label for="input-machine-host">Endereço IP / Host *</label>
-            <input type="text" id="input-machine-host" class="form-control" placeholder="Ex: 192.168.1.100 ou 127.0.0.1" required>
-          </div>
-        </div>
-
-        <!-- Campos FOCAS -->
-        <div class="driver-options" id="options-focas">
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label for="input-machine-focas-port">Porta FOCAS Ethernet</label>
-              <input type="number" id="input-machine-focas-port" class="form-control" value="8193">
+        <div class="card-body">
+          <div class="telemetry-grid">
+            <div class="telemetry-item">
+              <span class="telemetry-label">Peças Produzidas (PRM #6711)</span>
+              <span class="telemetry-value highlight" id="cnc-parts-count" style="color: #38bdf8; font-size: 1.25rem;">---</span>
             </div>
-            <div class="form-group flex-1">
-              <label for="input-machine-timeout">Timeout (ms)</label>
-              <input type="number" id="input-machine-timeout" class="form-control" value="5000">
+            <div class="telemetry-item">
+              <span class="telemetry-label">Programa CNC</span>
+              <span class="telemetry-value highlight" id="cnc-program">---</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Feedrate Atual</span>
+              <span class="telemetry-value" id="cnc-feedrate">---</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Spindle (RPM)</span>
+              <span class="telemetry-value" id="cnc-spindle">---</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Alarme Geral</span>
+              <span class="telemetry-value text-muted" id="cnc-alarm-status">---</span>
             </div>
           </div>
-        </div>
 
-        <!-- Campos OPC UA -->
-        <div class="driver-options" id="options-opcua">
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label for="input-machine-opcua-port">Porta OPC UA</label>
-              <input type="number" id="input-machine-opcua-port" class="form-control" value="4840">
+          <!-- Seletor do Sistema de Coordenadas dos Eixos -->
+          <div class="axis-header-row">
+            <div class="axis-header-title">
+              <span class="axis-title-icon">📍</span>
+              <strong>Posições dos Eixos</strong>
             </div>
-            <div class="form-group flex-2">
-              <label for="input-machine-opcua-endpoint">Endpoint OPC UA URL</label>
-              <input type="text" id="input-machine-opcua-endpoint" class="form-control" placeholder="opc.tcp://127.0.0.1:4840">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group flex-1">
-              <label for="input-machine-username">Usuário OPC UA</label>
-              <input type="text" id="input-machine-username" class="form-control" value="OpcUaClient">
-            </div>
-            <div class="form-group flex-1">
-              <label for="input-machine-password">Senha OPC UA</label>
-              <input type="password" id="input-machine-password" class="form-control" value="OpcUaClient">
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" id="btn-cancel-machine">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="btn-save-machine">
-            💾 Salvar Configurações
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ==================== MODAL 2: PAINEL DE CONTROLE INDIVIDUAL DA MÁQUINA ==================== -->
-  <div class="modal-backdrop modal-large-backdrop" id="modal-machine-panel">
-    <div class="modal-window modal-window-large">
-      <div class="modal-header">
-        <div class="modal-header-info">
-          <span class="status-indicator-dot disconnected" id="panel-machine-dot"></span>
-          <div>
-            <h3 class="modal-title" id="panel-machine-title">Máquina Selecionada</h3>
-            <span class="panel-machine-subtitle" id="panel-machine-subtitle">IP: --- | Driver: ---</span>
-          </div>
-        </div>
-        <div class="modal-header-controls">
-          <button class="btn btn-outline btn-sm" id="btn-panel-toggle-connect">
-            🔌 Conectar
-          </button>
-          <button class="modal-close" id="btn-close-machine-panel">&times;</button>
-        </div>
-      </div>
-
-      <div class="modal-body modal-body-scrollable">
-
-        <!-- Abas de Operação da Máquina -->
-        <div class="panel-tabs">
-          <button class="panel-tab active" data-tab="tab-pmc">🎛️ Leitura & Escrita de Tags (PMC)</button>
-          <button class="panel-tab" data-tab="tab-telemetry">⚡ Telemetria & Eixos</button>
-          <button class="panel-tab" data-tab="tab-io">🔌 Painel de Bits (I/O)</button>
-          <button class="panel-tab" data-tab="tab-params">⚙️ Parâmetros CNC</button>
-        </div>
-
-        <!-- ABA 1: LEITURA & ESCRITA DE TAGS PMC (PRINCIPAL) -->
-        <div class="tab-content active" id="tab-pmc">
-          
-          <!-- SEÇÃO: TAGS DE LEITURA (CICLO AUTOMÁTICO / REFRESH) -->
-          <div class="pmc-section-block">
-            <div class="section-subhead">
-              <div>
-                <h4 class="subhead-title">📥 Tags de Leitura Automática (Atualizadas a Cada Refresh)</h4>
-                <p class="subhead-desc">Tags cadastradas que são lidas ciclicamente em tempo real do CLP desta máquina.</p>
-              </div>
-              <button class="btn btn-primary btn-sm" id="btn-open-add-read-tag">
-                ➕ Adicionar Tag de Leitura
+            <div class="coord-selector-group" id="coord-type-selector">
+              <button type="button" class="coord-btn active" data-coord="absolute" title="Posição Absoluta (G90)">
+                <span class="coord-dot"></span> Absoluto (ABS)
               </button>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Nome da Tag</th>
-                    <th>Endereço</th>
-                    <th>Tipo</th>
-                    <th>Valor Atual (Decimal)</th>
-                    <th>Valor (Hex)</th>
-                    <th>Bits (7..0)</th>
-                    <th>Descrição</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-read-tags">
-                  <tr>
-                    <td colspan="8" class="text-center text-muted">Carregando tags de leitura...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- SEÇÃO: TAGS DE ESCRITA (COMANDOS & SETPOINTS NO CLP) -->
-          <div class="pmc-section-block">
-            <div class="section-subhead">
-              <div>
-                <h4 class="subhead-title">📤 Tags de Escrita Cadastradas (Comandos & Setpoints)</h4>
-                <p class="subhead-desc">Tags de controle para envio rápido de valores e acionamentos no CLP.</p>
-              </div>
-              <button class="btn btn-danger btn-sm" id="btn-open-add-write-tag">
-                ➕ Adicionar Tag de Escrita
+              <button type="button" class="coord-btn" data-coord="relative" title="Posição Relativa (G91)">
+                <span class="coord-dot"></span> Relativo (REL)
               </button>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Nome do Comando</th>
-                    <th>Endereço</th>
-                    <th>Tipo</th>
-                    <th>Valor Configurado</th>
-                    <th>Disparo / Execução</th>
-                    <th>Descrição</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-write-tags">
-                  <tr>
-                    <td colspan="7" class="text-center text-muted">Carregando tags de escrita...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- SEÇÃO: LEITURA & ESCRITA PONTUAL / DIAGNÓSTICO -->
-          <div class="pmc-section-block-collapsible">
-            <details>
-              <summary class="collapsible-summary">🔧 Diagnóstico / Teste Manual de Registradores Avulsos</summary>
-              <div class="card-body-pmc" style="margin-top: 1rem;">
-                <form id="form-panel-pmc-read" class="form-row">
-                  <div class="form-group flex-1">
-                    <label>Tipo de Endereço</label>
-                    <select id="panel-pmc-type" class="form-control">
-                      <option value="R" selected>R - Relés Internos</option>
-                      <option value="D">D - Tabela de Dados</option>
-                      <option value="X">X - Entradas Digitais</option>
-                      <option value="Y">Y - Saídas Digitais</option>
-                      <option value="K">K - Keep Relays</option>
-                      <option value="G">G - Sinais CNC -> PMC</option>
-                      <option value="F">F - Sinais PMC -> CNC</option>
-                      <option value="A">A - Alarmes do CLP</option>
-                    </select>
-                  </div>
-                  <div class="form-group flex-1">
-                    <label>Endereço Inicial</label>
-                    <input type="number" id="panel-pmc-address" class="form-control" value="1000" min="0">
-                  </div>
-                  <div class="form-group flex-1">
-                    <label>Quantidade</label>
-                    <input type="number" id="panel-pmc-count" class="form-control" value="4" min="1" max="100">
-                  </div>
-                  <div class="form-group flex-1">
-                    <label>Tipo de Dado</label>
-                    <select id="panel-pmc-datatype" class="form-control">
-                      <option value="Byte" selected>Byte (8 bits)</option>
-                      <option value="Word">Word (16 bits)</option>
-                      <option value="Long">Long (32 bits)</option>
-                    </select>
-                  </div>
-                  <div class="form-group flex-auto align-end">
-                    <button type="submit" class="btn btn-secondary" id="btn-panel-read-pmc">
-                      🔍 Leitura Manual
-                    </button>
-                  </div>
-                </form>
-
-                <div class="table-responsive">
-                  <table class="data-table">
-                    <thead>
-                      <tr>
-                        <th>Endereço</th>
-                        <th>Valor (Decimal)</th>
-                        <th>Valor (Hex)</th>
-                        <th>Representação em Bits (7 -> 0)</th>
-                      </tr>
-                    </thead>
-                    <tbody id="panel-pmc-results-tbody">
-                      <tr>
-                        <td colspan="4" class="text-center text-muted">Execute uma leitura manual para testar.</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Escrita Avulsa -->
-                <div class="write-box">
-                  <h4 class="write-box-title">✍️ Escrita Manual Avulsa</h4>
-                  <form id="form-panel-pmc-write" class="form-row">
-                    <div class="form-group flex-1">
-                      <label>Tipo e Endereço</label>
-                      <div class="input-group">
-                        <span class="input-prefix" id="write-addr-prefix">R</span>
-                        <input type="number" id="panel-write-address" class="form-control" value="1000">
-                      </div>
-                    </div>
-                    <div class="form-group flex-2">
-                      <label>Valores (separe por vírgula para múltiplos)</label>
-                      <input type="text" id="panel-write-values" class="form-control" placeholder="Ex: 255 ou 10, 20, 30">
-                    </div>
-                    <div class="form-group flex-1">
-                      <label>Tipo de Dado</label>
-                      <select id="panel-write-datatype" class="form-control">
-                        <option value="Byte" selected>Byte</option>
-                        <option value="Word">Word</option>
-                        <option value="Long">Long</option>
-                      </select>
-                    </div>
-                    <div class="form-group flex-auto align-end">
-                      <button type="submit" class="btn btn-danger" id="btn-panel-write-pmc">
-                        ⚡ Escrever Avulso
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </details>
-          </div>
-
-        </div>
-
-        <!-- ABA 2: TELEMETRIA & EIXOS -->
-        <div class="tab-content" id="tab-telemetry">
-          <div class="telemetry-grid-large">
-            <div class="telemetry-box">
-              <span class="t-label">Modo de Operação</span>
-              <span class="t-val highlight" id="panel-cnc-mode">---</span>
-            </div>
-            <div class="telemetry-box">
-              <span class="t-label">Status de Execução</span>
-              <span class="t-val" id="panel-cnc-run">---</span>
-            </div>
-            <div class="telemetry-box">
-              <span class="t-label">Programa Ativo</span>
-              <span class="t-val highlight" id="panel-cnc-prog">---</span>
-            </div>
-            <div class="telemetry-box">
-              <span class="t-label">Peças Produzidas</span>
-              <span class="t-val highlight" id="panel-cnc-parts">---</span>
-            </div>
-            <div class="telemetry-box">
-              <span class="t-label">Avanço (Feedrate)</span>
-              <span class="t-val" id="panel-cnc-feed">---</span>
-            </div>
-            <div class="telemetry-box">
-              <span class="t-label">Spindle (RPM)</span>
-              <span class="t-val" id="panel-cnc-spindle">---</span>
-            </div>
-            <div class="telemetry-box">
-              <span class="t-label">Alarme da Máquina</span>
-              <span class="t-val text-muted" id="panel-cnc-alarm">---</span>
+              <button type="button" class="coord-btn" data-coord="machine" title="Coordenadas de Máquina">
+                <span class="coord-dot"></span> Máquina (MCN)
+              </button>
+              <button type="button" class="coord-btn" data-coord="distance" title="Distância a Percorrer">
+                <span class="coord-dot"></span> Distância (DIST)
+              </button>
             </div>
           </div>
 
           <!-- Posições dos Eixos -->
-          <div class="axis-display-large">
-            <div class="axis-card">
-              <span class="axis-title">EIXO X</span>
-              <span class="axis-value" id="panel-axis-x">---</span>
+          <div class="axis-display">
+            <div class="axis-box">
+              <span class="axis-name">Eixo X</span>
+              <span class="axis-coord" id="axis-x">---</span>
               <span class="axis-unit">mm</span>
             </div>
-            <div class="axis-card">
-              <span class="axis-title">EIXO Y</span>
-              <span class="axis-value" id="panel-axis-y">---</span>
+            <div class="axis-box">
+              <span class="axis-name">Eixo Y</span>
+              <span class="axis-coord" id="axis-y">---</span>
               <span class="axis-unit">mm</span>
             </div>
-            <div class="axis-card">
-              <span class="axis-title">EIXO Z</span>
-              <span class="axis-value" id="panel-axis-z">---</span>
+            <div class="axis-box">
+              <span class="axis-name">Eixo Z</span>
+              <span class="axis-coord" id="axis-z">---</span>
               <span class="axis-unit">mm</span>
             </div>
-            <div class="axis-card">
-              <span class="axis-title">EIXO A</span>
-              <span class="axis-value" id="panel-axis-a">---</span>
+            <div class="axis-box">
+              <span class="axis-name">Eixo A</span>
+              <span class="axis-coord" id="axis-a">---</span>
               <span class="axis-unit">graus</span>
             </div>
           </div>
         </div>
+      </section>
 
-        <!-- ABA 3: PAINEL DE BITS (I/O) -->
-        <div class="tab-content" id="tab-io">
-          <div class="bitfield-desc">
-            Clique nos bits de saídas físicas (Y) ou relés (R) para alternar o estado na máquina selecionada.
+      <!-- Card 2: Painel de I/O Digital (LEDs e Bits) -->
+      <section class="card bitfield-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon">🔌</span>
+            Painel de I/O Digital (Bits do CLP)
           </div>
-          <div class="bit-groups-grid">
-            <div class="bit-panel-box">
-              <div class="bit-panel-header">
-                <span class="bit-panel-title">Entradas Digitais (X0)</span>
-                <span class="bit-byte-label" id="panel-byte-x0">Valor: ---</span>
-              </div>
-              <div class="bit-matrix" id="panel-matrix-x0"></div>
-            </div>
-
-            <div class="bit-panel-box">
-              <div class="bit-panel-header">
-                <span class="bit-panel-title">Saídas Físicas (Y0)</span>
-                <span class="bit-byte-label" id="panel-byte-y0">Valor: ---</span>
-              </div>
-              <div class="bit-matrix" id="panel-matrix-y0"></div>
-            </div>
-
-            <div class="bit-panel-box">
-              <div class="bit-panel-header">
-                <span class="bit-panel-title">Relés Internos (R1000)</span>
-                <span class="bit-byte-label" id="panel-byte-r1000">Valor: ---</span>
-              </div>
-              <div class="bit-matrix" id="panel-matrix-r1000"></div>
-            </div>
-
-            <div class="bit-panel-box">
-              <div class="bit-panel-header">
-                <span class="bit-panel-title">Keep Relays (K0)</span>
-                <span class="bit-byte-label" id="panel-byte-k0">Valor: ---</span>
-              </div>
-              <div class="bit-matrix" id="panel-matrix-k0"></div>
-            </div>
-          </div>
+          <span class="tag-desc">Clique nos bits de Y / R para alternar</span>
         </div>
-
-        <!-- ABA 4: PARÂMETROS CNC -->
-        <div class="tab-content" id="tab-params">
-          <div class="params-container">
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Número do Parâmetro CNC</label>
-                <input type="number" id="panel-param-num" class="form-control" value="5001">
+        <div class="card-body">
+          <div class="bit-groups-container">
+            <!-- Entradas X0 -->
+            <div class="bit-group">
+              <div class="bit-group-header">
+                <span class="bit-group-title">Entradas Físicas (X0)</span>
+                <span class="bit-byte-val" id="byte-val-x0">Valor: ---</span>
               </div>
-              <div class="form-group flex-1">
-                <label>Eixo (0 = Geral, 1 = X, 2 = Y, 3 = Z)</label>
-                <input type="number" id="panel-param-axis" class="form-control" value="1">
-              </div>
-              <div class="form-group flex-auto align-end">
-                <button type="button" class="btn btn-primary" id="btn-panel-read-param">
-                  🔍 Ler Parâmetro
-                </button>
+              <div class="bit-matrix" id="bit-matrix-x0">
+                <!-- Bits 0-7 gerados dinamicamente -->
               </div>
             </div>
 
-            <div class="param-result-display" id="panel-param-display">
-              <span class="text-muted">Informe o parâmetro e clique em ler.</span>
+            <!-- Saídas Y0 -->
+            <div class="bit-group">
+              <div class="bit-group-header">
+                <span class="bit-group-title">Saídas Físicas (Y0)</span>
+                <span class="bit-byte-val" id="byte-val-y0">Valor: ---</span>
+              </div>
+              <div class="bit-matrix" id="bit-matrix-y0">
+                <!-- Bits 0-7 gerados dinamicamente -->
+              </div>
             </div>
 
-            <div class="write-box">
-              <h4 class="write-box-title">✍️ Escrever Parâmetro CNC</h4>
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label>Novo Valor</label>
-                  <input type="number" id="panel-param-new-val" class="form-control" value="120450">
-                </div>
-                <div class="form-group flex-auto align-end">
-                  <button type="button" class="btn btn-danger" id="btn-panel-write-param">
-                    ⚡ Gravar Parâmetro
-                  </button>
-                </div>
+            <!-- Relés R1000 -->
+            <div class="bit-group">
+              <div class="bit-group-header">
+                <span class="bit-group-title">Relés Internos (R1000)</span>
+                <span class="bit-byte-val" id="byte-val-r1000">Valor: ---</span>
+              </div>
+              <div class="bit-matrix" id="bit-matrix-r1000">
+                <!-- Bits 0-7 gerados dinamicamente -->
+              </div>
+            </div>
+
+            <!-- Keep Relays K0 -->
+            <div class="bit-group">
+              <div class="bit-group-header">
+                <span class="bit-group-title">Keep Relays (K0)</span>
+                <span class="bit-byte-val" id="byte-val-k0">Valor: ---</span>
+              </div>
+              <div class="bit-matrix" id="bit-matrix-k0">
+                <!-- Bits 0-7 gerados dinamicamente -->
               </div>
             </div>
           </div>
         </div>
+      </section>
 
-      </div>
-    </div>
-  </div>
+      <!-- Card 3: Leitor e Escritor de Registradores do PMC -->
+      <section class="card pmc-control-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon">🎛️</span>
+            Leitura & Escrita no CLP (PMC)
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="pmc-type">Tipo de Endereço</label>
+              <select id="pmc-type" class="form-control">
+                <option value="R" selected>R - Relés Internos</option>
+                <option value="D">D - Tabela de Dados</option>
+                <option value="X">X - Entradas Digitais</option>
+                <option value="Y">Y - Saídas Digitais</option>
+                <option value="K">K - Keep Relays</option>
+                <option value="G">G - Sinais para CNC</option>
+                <option value="F">F - Sinais do CNC</option>
+                <option value="A">A - Alarmes/Mensagens</option>
+                <option value="T">T - Temporizadores</option>
+                <option value="C">C - Contadores</option>
+              </select>
+            </div>
 
-  <!-- ==================== MODAL 3: ADICIONAR TAG (LEITURA OU ESCRITA) ==================== -->
-  <div class="modal-backdrop" id="modal-add-tag">
-    <div class="modal-window">
-      <div class="modal-header">
-        <h3 class="modal-title" id="modal-tag-title">🏷️ Cadastrar Tag do CLP</h3>
-        <button class="modal-close" id="btn-close-add-tag">&times;</button>
-      </div>
-      <form id="form-add-tag" class="modal-body">
-        <input type="hidden" id="input-tag-direction" value="READ">
+            <div class="form-group">
+              <label for="pmc-address">Endereço Inicial</label>
+              <input type="number" id="pmc-address" class="form-control" value="1000" min="0">
+            </div>
 
-        <div class="form-group">
-          <label>Finalidade da Tag *</label>
-          <div class="tag-direction-selector">
-            <button type="button" class="btn-direction active" id="btn-dir-read" data-dir="READ">
-              📥 Tag de Leitura (Refresh Automático)
+            <div class="form-group">
+              <label for="pmc-count">Quantidade</label>
+              <input type="number" id="pmc-count" class="form-control" value="4" min="1" max="100">
+            </div>
+
+            <div class="form-group">
+              <label for="pmc-data-type">Tipo de Dado</label>
+              <select id="pmc-data-type" class="form-control">
+                <option value="Byte" selected>Byte (8 bits)</option>
+                <option value="Word">Word (16 bits)</option>
+                <option value="Long">Long (32 bits)</option>
+                <option value="Float">Float (IEEE 754)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row action-row">
+            <button class="btn btn-primary" id="btn-pmc-read">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Ler do CLP
             </button>
-            <button type="button" class="btn-direction" id="btn-dir-write" data-dir="WRITE">
-              📤 Tag de Escrita (Comando / Setpoint)
-            </button>
+
+            <div class="write-inline-group">
+              <input type="text" id="pmc-write-values" class="form-control" placeholder="Valores para escrever (ex: 10, 20, 30)">
+              <button class="btn btn-success" id="btn-pmc-write">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Escrever no CLP
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabela de Resultados de Leitura PMC -->
+          <div class="table-container">
+            <table class="data-table" id="pmc-results-table">
+              <thead>
+                <tr>
+                  <th>Endereço</th>
+                  <th>Valor Decimal</th>
+                  <th>Hexadecimal</th>
+                  <th>Representação Binária (Bits 7..0)</th>
+                </tr>
+              </thead>
+              <tbody id="pmc-results-tbody">
+                <tr>
+                  <td colspan="4" class="text-center text-muted">Nenhum dado lido ainda. Clique em "Ler do CLP".</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
+      </section>
 
-        <div class="form-group">
-          <label>Nome Identificador da Tag *</label>
-          <input type="text" id="input-tag-name" class="form-control" placeholder="Ex: Status_Pressao_Hidraulica ou Comando_Soltar_Placa" required>
+      <!-- Card 4: Ajuste de Parâmetros CNC -->
+      <section class="card params-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon">⚙️</span>
+            Parâmetros do CNC (cnc_rdparam / cnc_wrparam)
+          </div>
         </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="param-number">Nº do Parâmetro</label>
+              <input type="number" id="param-number" class="form-control" value="3003" min="0" placeholder="Ex: 3003, 5001">
+            </div>
 
-        <div class="form-row">
-          <div class="form-group flex-1">
-            <label>Tipo de Endereço</label>
-            <select id="input-tag-type" class="form-control">
-              <option value="R">R - Relé Interno</option>
-              <option value="D">D - Tabela de Dados</option>
-              <option value="X">X - Entrada Digital</option>
-              <option value="Y">Y - Saída Digital</option>
-              <option value="K">K - Keep Relay</option>
-              <option value="G">G - Sinal CNC -> PMC</option>
-              <option value="F">F - Sinal PMC -> CNC</option>
-              <option value="A">A - Alarme do CLP</option>
+            <div class="form-group">
+              <label for="param-value-write">Novo Valor para Salvar</label>
+              <input type="number" id="param-value-write" class="form-control" placeholder="Digite o novo valor (ex: 32)">
+            </div>
+          </div>
+
+          <div class="form-row action-row">
+            <button class="btn btn-primary" id="btn-param-read">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Ler Parâmetro
+            </button>
+            <button class="btn btn-success" id="btn-param-write">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Salvar Parâmetro
+            </button>
+          </div>
+
+          <!-- Tabela de Resultados de Parâmetros CNC -->
+          <div class="table-container">
+            <table class="data-table" id="param-results-table">
+              <thead>
+                <tr>
+                  <th>Nº Parâmetro</th>
+                  <th>Valor Decimal</th>
+                  <th>Hexadecimal</th>
+                  <th>Representação Binária (Bits 7..0)</th>
+                  <th>Tipo de Dado</th>
+                </tr>
+              </thead>
+              <tbody id="param-results-tbody">
+                <tr>
+                  <td colspan="5" class="text-center text-muted">Selecione o número do parâmetro e clique em "Ler Parâmetro".</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card 5: Log de Atividades e Diagnóstico -->
+      <section class="card logs-card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon">📜</span>
+            Log de Comunicação & Eventos
+          </div>
+          <button class="btn btn-secondary btn-xs" id="btn-clear-logs">Limpar Logs</button>
+        </div>
+        <div class="card-body">
+          <div class="logs-console" id="logs-console">
+            <div class="log-entry log-info">
+              <span class="log-time">[00:00:00]</span>
+              <span class="log-msg">Sistema de comunicação Fanuc FOCAS inicializado.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal de Configuração de Conexão -->
+    <div class="modal-overlay" id="config-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Configurações de Comunicação</h2>
+          <button class="modal-close" id="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="cfg-driver">Tipo de Driver / Comunicação</label>
+            <select id="cfg-driver" class="form-control">
+              <option value="focas_dll" selected>FOCAS DLL Nativa (FWLIB32.dll / FWLIB64.dll) [Padrão Fanuc]</option>
+              <option value="focas_tcp">FOCAS TCP Direto (Porta 8193 - Ethernet Socket)</option>
+              <option value="opcua">OPC UA (Porta 4840 / CNCnetPDM / Servidor Fanuc)</option>
             </select>
           </div>
-          <div class="form-group flex-1">
-            <label>Endereço Numérico</label>
-            <input type="number" id="input-tag-address" class="form-control" value="1000" min="0" required>
+
+          <div class="form-group">
+            <label for="cfg-host">Endereço IP / Host</label>
+            <input type="text" id="cfg-host" class="form-control" value="169.254.214.5">
           </div>
-          <div class="form-group flex-1">
-            <label>Tipo de Dado</label>
-            <select id="input-tag-datatype" class="form-control">
-              <option value="Byte" selected>Byte (8 bits)</option>
-              <option value="Word">Word (16 bits)</option>
-              <option value="Long">Long (32 bits)</option>
-            </select>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cfg-port">Porta OPC UA</label>
+              <input type="number" id="cfg-port" class="form-control" value="4840">
+            </div>
+
+            <div class="form-group">
+              <label for="cfg-focas-port">Porta FOCAS Ethernet</label>
+              <input type="number" id="cfg-focas-port" class="form-control" value="8193">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="cfg-opcua-endpoint">Endpoint OPC UA Personalizado</label>
+            <input type="text" id="cfg-opcua-endpoint" class="form-control" value="opc.tcp://127.0.0.1:4840">
           </div>
         </div>
-
-        <!-- Campo exclusivo de valor de escrita -->
-        <div class="form-group" id="group-write-value" style="display: none;">
-          <label>Valor Padrão de Escrita (para comandos)</label>
-          <input type="text" id="input-tag-write-value" class="form-control" value="1" placeholder="Ex: 1 ou 255 ou 100">
-        </div>
-
-        <div class="form-group">
-          <label>Descrição Funcional</label>
-          <input type="text" id="input-tag-desc" class="form-control" placeholder="Ex: Monitoramento da pressão de linha / Acionamento do pistão">
-        </div>
-
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" id="btn-cancel-add-tag">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="btn-save-tag">💾 Salvar Tag</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ==================== MODAL 4: CONFIRMAÇÃO DE EXCLUSÃO ==================== -->
-  <div class="modal-backdrop" id="modal-confirm-delete">
-    <div class="modal-window" style="max-width: 480px;">
-      <div class="modal-header">
-        <h3 class="modal-title" id="confirm-delete-title">🗑️ Confirmar Exclusão</h3>
-        <button class="modal-close" id="btn-close-confirm-delete">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p id="confirm-delete-msg" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main);">
-          Tem certeza que deseja excluir este item permanentemente?
-        </p>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" id="btn-cancel-confirm-delete">Cancelar</button>
-          <button type="button" class="btn btn-danger" id="btn-action-confirm-delete">Sim, Excluir</button>
+          <button class="btn btn-danger" id="btn-modal-disconnect">Desconectar</button>
+          <button class="btn btn-primary" id="btn-modal-save">Salvar & Conectar</button>
         </div>
       </div>
     </div>
+
+    <!-- Toast de Notificações -->
+    <div class="toast-container" id="toast-container"></div>
   </div>
 
   <script src="app.js"></script>

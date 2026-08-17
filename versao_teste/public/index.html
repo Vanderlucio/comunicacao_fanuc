@@ -51,32 +51,24 @@
 
     <!-- Grid Principal -->
     <main class="dashboard-grid">
-      <!-- Card 1: Telemetria e Estado da Máquina -->
+      <!-- Card 1: Telemetria e Leitura do CNC -->
       <section class="card cnc-telemetry-card">
         <div class="card-header">
           <div class="card-title">
             <span class="card-icon">⚡</span>
-            Estado do CNC & Posições
+            Leitura & Telemetria do CNC (Eixos, Peças e Programa)
           </div>
           <span class="badge badge-accent" id="cnc-mode-badge">MODO: ---</span>
         </div>
         <div class="card-body">
           <div class="telemetry-grid">
             <div class="telemetry-item">
-              <span class="telemetry-label">Status de Execução</span>
-              <span class="telemetry-value" id="cnc-run-status">---</span>
-            </div>
-            <div class="telemetry-item">
-              <span class="telemetry-label">Alarme Geral</span>
-              <span class="telemetry-value text-muted" id="cnc-alarm-status">---</span>
+              <span class="telemetry-label">Peças Produzidas (PRM #6711)</span>
+              <span class="telemetry-value highlight" id="cnc-parts-count" style="color: #38bdf8; font-size: 1.25rem;">---</span>
             </div>
             <div class="telemetry-item">
               <span class="telemetry-label">Programa CNC</span>
               <span class="telemetry-value highlight" id="cnc-program">---</span>
-            </div>
-            <div class="telemetry-item">
-              <span class="telemetry-label">Peças Produzidas</span>
-              <span class="telemetry-value highlight" id="cnc-parts-count">---</span>
             </div>
             <div class="telemetry-item">
               <span class="telemetry-label">Feedrate Atual</span>
@@ -85,6 +77,32 @@
             <div class="telemetry-item">
               <span class="telemetry-label">Spindle (RPM)</span>
               <span class="telemetry-value" id="cnc-spindle">---</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="telemetry-label">Alarme Geral</span>
+              <span class="telemetry-value text-muted" id="cnc-alarm-status">---</span>
+            </div>
+          </div>
+
+          <!-- Seletor do Sistema de Coordenadas dos Eixos -->
+          <div class="axis-header-row">
+            <div class="axis-header-title">
+              <span class="axis-title-icon">📍</span>
+              <strong>Posições dos Eixos</strong>
+            </div>
+            <div class="coord-selector-group" id="coord-type-selector">
+              <button type="button" class="coord-btn active" data-coord="absolute" title="Posição Absoluta (G90)">
+                <span class="coord-dot"></span> Absoluto (ABS)
+              </button>
+              <button type="button" class="coord-btn" data-coord="relative" title="Posição Relativa (G91)">
+                <span class="coord-dot"></span> Relativo (REL)
+              </button>
+              <button type="button" class="coord-btn" data-coord="machine" title="Coordenadas de Máquina">
+                <span class="coord-dot"></span> Máquina (MCN)
+              </button>
+              <button type="button" class="coord-btn" data-coord="distance" title="Distância a Percorrer">
+                <span class="coord-dot"></span> Distância (DIST)
+              </button>
             </div>
           </div>
 
@@ -274,33 +292,51 @@
           <div class="form-row">
             <div class="form-group">
               <label for="param-number">Nº do Parâmetro</label>
-              <input type="number" id="param-number" class="form-control" value="5001" min="0">
+              <input type="number" id="param-number" class="form-control" value="3003" min="0" placeholder="Ex: 3003, 5001">
             </div>
 
             <div class="form-group">
-              <label for="param-axis">Eixo</label>
-              <select id="param-axis" class="form-control">
-                <option value="0">0 - Geral / Todos</option>
-                <option value="1" selected>1 - Eixo X</option>
-                <option value="2">2 - Eixo Y</option>
-                <option value="3">3 - Eixo Z</option>
-                <option value="4">4 - Eixo A</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="param-value-write">Novo Valor</label>
-              <input type="number" id="param-value-write" class="form-control" value="120450">
+              <label for="param-value-write">Novo Valor para Salvar</label>
+              <input type="number" id="param-value-write" class="form-control" placeholder="Digite o novo valor (ex: 32)">
             </div>
           </div>
 
           <div class="form-row action-row">
-            <button class="btn btn-primary" id="btn-param-read">Ler Parâmetro</button>
-            <button class="btn btn-success" id="btn-param-write">Salvar Parâmetro</button>
+            <button class="btn btn-primary" id="btn-param-read">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Ler Parâmetro
+            </button>
+            <button class="btn btn-success" id="btn-param-write">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Salvar Parâmetro
+            </button>
           </div>
 
-          <div class="param-result-box" id="param-result-display">
-            <span class="text-muted">Selecione o número do parâmetro e clique em "Ler Parâmetro".</span>
+          <!-- Tabela de Resultados de Parâmetros CNC -->
+          <div class="table-container">
+            <table class="data-table" id="param-results-table">
+              <thead>
+                <tr>
+                  <th>Nº Parâmetro</th>
+                  <th>Valor Decimal</th>
+                  <th>Hexadecimal</th>
+                  <th>Representação Binária (Bits 7..0)</th>
+                  <th>Tipo de Dado</th>
+                </tr>
+              </thead>
+              <tbody id="param-results-tbody">
+                <tr>
+                  <td colspan="5" class="text-center text-muted">Selecione o número do parâmetro e clique em "Ler Parâmetro".</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -336,15 +372,15 @@
           <div class="form-group">
             <label for="cfg-driver">Tipo de Driver / Comunicação</label>
             <select id="cfg-driver" class="form-control">
-              <option value="opcua" selected>OPC UA (Porta 4840 / CNCnetPDM / Servidor Fanuc)</option>
+              <option value="focas_dll" selected>FOCAS DLL Nativa (FWLIB32.dll / FWLIB64.dll) [Padrão Fanuc]</option>
               <option value="focas_tcp">FOCAS TCP Direto (Porta 8193 - Ethernet Socket)</option>
-              <option value="focas_dll">FOCAS DLL Nativa (FWLIB32.dll / FWLIB64.dll)</option>
+              <option value="opcua">OPC UA (Porta 4840 / CNCnetPDM / Servidor Fanuc)</option>
             </select>
           </div>
 
           <div class="form-group">
             <label for="cfg-host">Endereço IP / Host</label>
-            <input type="text" id="cfg-host" class="form-control" value="127.0.0.1">
+            <input type="text" id="cfg-host" class="form-control" value="169.254.214.5">
           </div>
 
           <div class="form-row">

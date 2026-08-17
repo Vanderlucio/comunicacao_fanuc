@@ -64,19 +64,43 @@ app.get('/api/status', async (req, res) => {
 // Trocar driver / atualizar conexão
 app.post('/api/connection', async (req, res) => {
   try {
-    const { driver, host, port, focasPort, opcuaEndpoint } = req.body;
-    if (driver) client.config.connection.driver = driver;
-    if (host) client.config.connection.host = host;
-    if (port) client.config.connection.port = Number(port);
-    if (focasPort) client.config.connection.focasPort = Number(focasPort);
-    if (opcuaEndpoint) client.config.connection.opcuaEndpoint = opcuaEndpoint;
+    const { driver = 'focas_dll', host = '169.254.214.5', port, focasPort = 8193, opcuaEndpoint } = req.body;
+    client.config.connection = client.config.connection || {};
+    client.config.connection.driver = driver;
+    client.config.connection.host = host;
+
+    if (driver === 'focas_dll' || driver === 'focas_tcp') {
+      const p = Number(focasPort || port || 8193);
+      client.config.connection.port = p;
+      client.config.connection.focasPort = p;
+    } else {
+      client.config.connection.port = Number(port || 4840);
+      if (opcuaEndpoint) client.config.connection.opcuaEndpoint = opcuaEndpoint;
+    }
 
     client.initDriver(client.config.connection.driver);
     const connResult = await client.connect();
 
+    // Persistir em config.json
+    try {
+      const configPaths = [
+        path.resolve(process.cwd(), 'config.json'),
+        path.resolve(__dirname, '../config.json'),
+        path.resolve(__dirname, '../../config.json')
+      ];
+      for (const cp of configPaths) {
+        if (fs.existsSync(cp)) {
+          fs.writeFileSync(cp, JSON.stringify(client.config, null, 2), 'utf8');
+        }
+      }
+    } catch (e) {}
+
+    // Disparar broadcast imediato da telemetria
+    pollAndBroadcastTelemetry();
+
     res.json({
       success: true,
-      message: connResult.message,
+      message: connResult.message || 'Conectado com sucesso ao CNC!',
       config: client.config
     });
   } catch (err) {
@@ -161,41 +185,61 @@ app.post('/api/parameter/write', async (req, res) => {
 });
 
 // WebSocket para telemetria em tempo real
-wss.on('connection', (ws) => {
-  const sendUpdate = async () => {
-    try {
-      if (ws.readyState === WebSocket.OPEN) {
-        const status = await client.readStatus();
-        const monitoredTags = [];
+let lastTelemetry = null;
+let isPollingTelemetry = false;
 
-        for (const tag of (client.config.monitoredPmcTags || [])) {
-          try {
-            const data = await client.readPmc(tag.addressType, tag.address, tag.length || 1, tag.dataType || 'Byte');
-            monitoredTags.push({
-              tag,
-              data
-            });
-          } catch (e) {
-            monitoredTags.push({ tag, error: e.message });
-          }
+async function pollAndBroadcastTelemetry() {
+  if (isPollingTelemetry) return;
+  isPollingTelemetry = true;
+
+  try {
+    const status = await client.readStatus();
+    const monitoredTags = [];
+
+    if (status && status.connected) {
+      for (const tag of (client.config.monitoredPmcTags || [])) {
+        try {
+          const data = await client.readPmc(tag.addressType, tag.address, tag.length || 1, tag.dataType || 'Byte');
+          monitoredTags.push({
+            tag,
+            data
+          });
+        } catch (e) {
+          monitoredTags.push({ tag, error: e.message });
         }
-
-        ws.send(JSON.stringify({
-          type: 'telemetry',
-          status,
-          monitoredTags,
-          timestamp: new Date().toISOString()
-        }));
       }
-    } catch (e) {}
-  };
+    }
 
-  const interval = setInterval(sendUpdate, 800);
-  sendUpdate();
+    lastTelemetry = {
+      type: 'telemetry',
+      status,
+      monitoredTags,
+      timestamp: new Date().toISOString()
+    };
 
-  ws.on('close', () => {
-    clearInterval(interval);
-  });
+    const payload = JSON.stringify(lastTelemetry);
+    for (const ws of wss.clients) {
+      if (ws.readyState === WebSocket.OPEN) {
+        try { ws.send(payload); } catch (e) {}
+      }
+    }
+  } catch (e) {
+    // Erros capturados para evitar crash
+  } finally {
+    isPollingTelemetry = false;
+  }
+}
+
+// Inicia loop de telemetria periódico estável a cada 1000ms
+setInterval(pollAndBroadcastTelemetry, 1000);
+
+wss.on('connection', (ws) => {
+  // Envia último estado imediatamente ao conectar novo cliente
+  if (lastTelemetry && ws.readyState === WebSocket.OPEN) {
+    try { ws.send(JSON.stringify(lastTelemetry)); } catch (e) {}
+  }
+  // Dispara uma leitura imediata
+  pollAndBroadcastTelemetry();
 });
 
 server.listen(PORT, () => {

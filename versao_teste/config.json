@@ -1,12 +1,12 @@
 {
   "connection": {
-    "driver": "opcua",
-    "host": "127.0.0.1",
-    "port": 4840,
+    "driver": "focas_dll",
+    "host": "169.254.214.5",
+    "port": 8193,
     "timeout": 5000,
     "focasPort": 8193,
     "focasDllPath": "Fwlib32.dll",
-    "opcuaEndpoint": "opc.tcp://127.0.0.1:4840",
+    "opcuaEndpoint": "opc.tcp://169.254.214.5:4840",
     "username": "OpcUaClient",
     "password": "OpcUaClient",
     "autoReconnect": true,

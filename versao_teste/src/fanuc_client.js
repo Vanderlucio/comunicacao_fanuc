@@ -34,21 +34,28 @@ class FanucClient extends EventEmitter {
    * Carrega configuração do arquivo config.json
    */
   loadDefaultConfig() {
-    const configPath = path.resolve(process.cwd(), 'config.json');
-    if (fs.existsSync(configPath)) {
-      try {
-        const raw = fs.readFileSync(configPath, 'utf8');
-        return JSON.parse(raw);
-      } catch (e) {
-        console.warn(`[FanucClient] Aviso: Não foi possível ler config.json: ${e.message}. Usando padrão.`);
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'config.json'),
+      path.resolve(__dirname, '../config.json'),
+      path.resolve(__dirname, '../../config.json')
+    ];
+    for (const configPath of candidatePaths) {
+      if (fs.existsSync(configPath)) {
+        try {
+          const raw = fs.readFileSync(configPath, 'utf8');
+          return JSON.parse(raw);
+        } catch (e) {
+          console.warn(`[FanucClient] Aviso: Não foi possível ler ${configPath}: ${e.message}.`);
+        }
       }
     }
     return {
       connection: {
-        driver: 'opcua',
-        host: '127.0.0.1',
-        port: 4840,
-        focasPort: 8193
+        driver: 'focas_dll',
+        host: '169.254.214.5',
+        port: 8193,
+        focasPort: 8193,
+        focasDllPath: 'Fwlib32.dll'
       }
     };
   }
@@ -260,16 +267,21 @@ class FanucClient extends EventEmitter {
       this.initDriver();
     }
     if (!this.isConnected()) {
-      return {
-        connected: false,
-        driver: this.driver ? this.driver.name : 'OFFLINE',
-        mode: 'OFFLINE',
-        runStatus: 'DESCONECTADO',
-        feedrate: '---',
-        spindleSpeed: '---',
-        positions: { X: '---', Y: '---', Z: '---', A: '---' },
-        timestamp: new Date().toISOString()
-      };
+      try {
+        await this.connect();
+      } catch (e) {
+        return {
+          connected: false,
+          driver: this.driver ? this.driver.name : 'OFFLINE',
+          mode: 'OFFLINE',
+          runStatus: 'DESCONECTADO',
+          error: e.message,
+          feedrate: '---',
+          spindleSpeed: '---',
+          positions: { X: '---', Y: '---', Z: '---', A: '---' },
+          timestamp: new Date().toISOString()
+        };
+      }
     }
     try {
       return await this.driver.readStatus();

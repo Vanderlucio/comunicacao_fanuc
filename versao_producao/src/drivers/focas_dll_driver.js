@@ -30,6 +30,7 @@ class FocasDllDriver extends BaseDriver {
     this.rl = null;
     this.pendingCallbacks = [];
     this.flibHandle = 0;
+    this._queue = Promise.resolve();
   }
 
   /**
@@ -38,13 +39,22 @@ class FocasDllDriver extends BaseDriver {
   startBridgeProcess() {
     if (this.process) return;
 
-    const bridgePath = path.resolve(process.cwd(), 'fanuc_bridge32.exe');
-    if (!fs.existsSync(bridgePath)) {
-      throw new Error(`Arquivo 'fanuc_bridge32.exe' não encontrado em ${bridgePath}`);
+    const candidateBridgePaths = [
+      path.resolve(process.cwd(), 'fanuc_bridge32.exe'),
+      path.resolve(__dirname, '../../fanuc_bridge32.exe'),
+      path.resolve(__dirname, '../../../fanuc_bridge32.exe'),
+      path.resolve(__dirname, '../fanuc_bridge32.exe')
+    ];
+
+    const bridgePath = candidateBridgePaths.find(p => fs.existsSync(p));
+    if (!bridgePath) {
+      throw new Error(`Arquivo 'fanuc_bridge32.exe' não encontrado.`);
     }
 
+    const bridgeDir = path.dirname(bridgePath);
+
     this.process = spawn(bridgePath, [], {
-      cwd: process.cwd(),
+      cwd: bridgeDir,
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -89,21 +99,32 @@ class FocasDllDriver extends BaseDriver {
   }
 
   /**
-   * Envia comando JSON para o processo bridge e aguarda resposta
+   * Envia comando JSON para o processo bridge de forma estritamente sequencial
    */
   async sendBridgeCommand(cmdObj) {
+    return new Promise((resolve, reject) => {
+      this._queue = this._queue.then(() => {
+        return this._executeBridgeCommand(cmdObj)
+          .then(resolve)
+          .catch(reject);
+      }).catch(() => {});
+    });
+  }
+
+  _executeBridgeCommand(cmdObj) {
     if (!this.process) {
       this.startBridgeProcess();
     }
 
     return new Promise((resolve, reject) => {
+      const timeoutMs = (this.timeout * 1000) + 3000;
       const timer = setTimeout(() => {
         const idx = this.pendingCallbacks.findIndex(cb => cb.resolve === resolve);
         if (idx !== -1) {
           this.pendingCallbacks.splice(idx, 1);
         }
         reject(new Error(`Timeout na chamada Fwlib32.dll (Comando: ${cmdObj.cmd})`));
-      }, (this.timeout * 1000) + 2000);
+      }, timeoutMs);
 
       this.pendingCallbacks.push({
         resolve: (val) => {
@@ -116,7 +137,14 @@ class FocasDllDriver extends BaseDriver {
         }
       });
 
-      this.process.stdin.write(JSON.stringify(cmdObj) + '\n');
+      try {
+        this.process.stdin.write(JSON.stringify(cmdObj) + '\n');
+      } catch (err) {
+        clearTimeout(timer);
+        const idx = this.pendingCallbacks.findIndex(cb => cb.resolve === resolve);
+        if (idx !== -1) this.pendingCallbacks.splice(idx, 1);
+        reject(err);
+      }
     });
   }
 
@@ -265,13 +293,30 @@ class FocasDllDriver extends BaseDriver {
       };
     }
 
+    const pos = res.positions || {};
+    const absPos = pos.absolute || pos;
+
     return {
       connected: this.connected,
       driver: this.name,
       mode: CNC_MODES[res.mode] || `MODO_${res.mode}`,
-      runStatus: CNC_RUN_STATUS[res.run] || `RUN_${res.run}`,
       emergency: res.emergency === true,
       alarm: res.alarm === true,
+      feedrate: res.feedrate || 0,
+      spindleSpeed: res.spindleSpeed || 0,
+      program: res.program || '---',
+      partsCount: res.partsCount !== undefined ? res.partsCount : 0,
+      totalParts: res.totalParts !== undefined ? res.totalParts : 0,
+      positions: {
+        X: absPos.X !== undefined ? absPos.X : 0.0,
+        Y: absPos.Y !== undefined ? absPos.Y : 0.0,
+        Z: absPos.Z !== undefined ? absPos.Z : 0.0,
+        A: absPos.A !== undefined ? absPos.A : 0.0,
+        absolute: pos.absolute || { X: 0, Y: 0, Z: 0, A: 0 },
+        relative: pos.relative || { X: 0, Y: 0, Z: 0, A: 0 },
+        machine: pos.machine || { X: 0, Y: 0, Z: 0, A: 0 },
+        distance: pos.distance || { X: 0, Y: 0, Z: 0, A: 0 }
+      },
       timestamp: new Date().toISOString()
     };
   }
