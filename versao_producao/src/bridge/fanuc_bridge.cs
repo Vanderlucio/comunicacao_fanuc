@@ -37,6 +37,14 @@ namespace FanucBridge
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
+            AppDomain.CurrentDomain.ProcessExit += (s, e) =>
+            {
+                if (isConnected && flibHandle != 0)
+                {
+                    try { Focas1.cnc_freelibhndl(flibHandle); } catch { }
+                }
+            };
+
             string line;
             while ((line = Console.ReadLine()) != null)
             {

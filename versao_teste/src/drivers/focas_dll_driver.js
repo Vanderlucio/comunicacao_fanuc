@@ -286,10 +286,11 @@ class FocasDllDriver extends BaseDriver {
 
     if (!res.success) {
       return {
-        connected: this.connected,
+        connected: false,
         driver: this.name,
         host: this.host,
-        port: this.port
+        port: this.port,
+        error: res.error || (res.ret !== undefined ? `Codigo: ${res.ret}` : 'Erro desconhecido')
       };
     }
 
